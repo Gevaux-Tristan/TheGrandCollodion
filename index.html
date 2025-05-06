@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <meta charset="UTF-8">
+  <title>La Cabine</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600&family=DM+Sans&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="preview">
+      <canvas id="canvas" class="placeholder"></canvas>
+    </div>
+    <div class="controls">
+      <img src="assets/logo.png" alt="The Grand Collodion" style="width: 180px; height: auto; margin-bottom: 10px;">
+      <label for="upload" class="material-btn">
+        <span class="material-symbols-outlined">upload</span>
+        Choisir une image
+      </label>
+      <input type="file" id="upload" accept="image/*" style="display:none;">
+
+      <label for="textureSelect">Texture :</label>
+      <select id="textureSelect">
+        <option value="collodion_overlay.png">Texture par défaut</option>
+        <option value="texture_concrete.png">Mur béton</option>
+        <option value="texture_collodion_dark.png" selected>Collodion foncé</option>
+        <option value="texture_dusty_plate.png">Plaque poussiéreuse</option>
+        <option value="texture_polaroid_frame.png">Cadre Polaroid</option>
+        <option value="texture_cracked_layer.png">Texture craquelée</option>
+      </select>
+
+      <label for="opacityRange">Opacité de la texture : <span id="opacityValue">0.55</span></label>
+      <input type="range" id="opacityRange" min="0" max="1" step="0.01" value="0.55">
+
+      <label for="intensityRange">Intensité du contraste : <span id="intensityValue">2.4</span></label>
+      <input type="range" id="intensityRange" min="1" max="3" step="0.1" value="2.4">
+
+      <button id="download" class="material-btn primary">
+        <span class="material-symbols-outlined">download</span> Télécharger
+      </button>
+    </div>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
