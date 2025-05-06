@@ -84,3 +84,20 @@ dropArea.addEventListener("drop", (e) => {
     document.getElementById("imageUpload").dispatchEvent(new Event("change"));
   }
 });
+canvas.addEventListener("dragover", (e) => {
+  e.preventDefault();
+});
+canvas.addEventListener("drop", (e) => {
+  e.preventDefault();
+  if (e.dataTransfer.files.length > 0) {
+    const fileInput = document.getElementById("imageUpload");
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(e.dataTransfer.files[0]);
+    fileInput.files = dataTransfer.files;
+    fileInput.dispatchEvent(new Event("change"));
+    const dropArea = document.getElementById("drop-area");
+    if (dropArea) {
+      dropArea.style.display = "none";
+    }
+  }
+});
