@@ -11,9 +11,16 @@
 <body>
   <div class="container">
     <div id="preview">
-      <canvas id="canvas"></canvas>
+      
+<div id="drop-area">
+  <p>Glissez une image ici ou cliquez ci-dessous</p>
+  
+</div>
+<canvas id="canvas"></canvas>
+
     </div>
     <div id="controls"><img src="logo.png" alt="Logo" style="width: 140px; margin-bottom: 20px;">
+<label>Image</label><input type="file" id="imageUpload" accept="image/*" />
       <label>Contraste</label>
       <input type="range" id="contrastSlider" min="0.5" max="3" step="0.1" value="2.4" />
 
@@ -23,13 +30,12 @@
       <label>Grain</label>
       <input type="range" id="grainSlider" min="0" max="1" step="0.01" value="0.2" />
 
-      <label>Texture</label>
       <select id="textureSelect">
         <option value="collodion-noir.jpeg">Collodion foncé</option><option value="collodion-clair.png">Collodion clair</option><option value="concrete.png">Concrete</option><option value="cracked.jpeg">Craquelé</option><option value="poussiere.jpeg">Poussière</option><option value="vieux-papier.jpeg">Vieux papier</option>
       </select>
 
       <label>Image</label>
-      <input type="file" id="imageUpload" accept="image/*" />
+      
 
       <button id="downloadBtn">Télécharger</button>
     </div>

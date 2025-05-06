@@ -50,3 +50,31 @@ select {
   font-family: 'DM Sans', sans-serif;
   border: 1px solid #FED702;
 }
+
+#drop-area {
+  border: 2px dashed #FED702;
+  padding: 20px;
+  text-align: center;
+  color: #FED702;
+  font-family: 'DM Sans', sans-serif;
+  margin-bottom: 10px;
+}
+#drop-area input {
+  display: block;
+  margin: 10px auto 0;
+}
+#drop-area p {
+  margin: 0;
+}
+
+#drop-area {
+  border: 2px dashed #FED702;
+  padding: 20px;
+  text-align: center;
+  color: #FED702;
+  font-family: 'DM Sans', sans-serif;
+  margin-bottom: 10px;
+}
+#drop-area.highlight {
+  background-color: rgba(255, 255, 0, 0.1);
+}

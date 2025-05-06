@@ -11,6 +11,7 @@ document.getElementById("textureSelect").addEventListener("change", () => {
 });
 
 document.getElementById("imageUpload").addEventListener("change", (e) => {
+  document.getElementById('drop-area').style.display = 'none';
   const reader = new FileReader();
   reader.onload = function (event) {
     image = new Image();
@@ -66,3 +67,20 @@ function render() {
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   ctx.putImageData(applyGrain(imgData, grain), 0, 0);
 }
+
+const dropArea = document.getElementById("drop-area");
+dropArea.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  dropArea.classList.add("highlight");
+});
+dropArea.addEventListener("dragleave", () => {
+  dropArea.classList.remove("highlight");
+});
+dropArea.addEventListener("drop", (e) => {
+  e.preventDefault();
+  dropArea.classList.remove("highlight");
+  if (e.dataTransfer.files.length > 0) {
+    document.getElementById("imageUpload").files = e.dataTransfer.files;
+    document.getElementById("imageUpload").dispatchEvent(new Event("change"));
+  }
+});
