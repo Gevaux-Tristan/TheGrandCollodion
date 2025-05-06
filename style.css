@@ -134,3 +134,34 @@ canvas.placeholder {
   display: block;
   margin: 0 auto;
 }
+
+
+#grain {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  background: #ccc;
+  border-radius: 2px;
+  outline: none;
+  margin-top: 4px;
+}
+#grain::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: #FED702;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 2px rgba(0,0,0,0.2);
+  transition: background 0.3s ease;
+}
+#grain::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: #FED702;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}

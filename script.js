@@ -102,3 +102,21 @@ download.addEventListener('click', () => {
 opacityValue.textContent = opacityRange.value;
 intensityValue.textContent = intensityRange.value;
 updateTexture();
+
+
+
+function applyGrain(ctx, width, height, grainAmount) {
+  if (!grainAmount || grainAmount <= 0) return;
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const noise = (Math.random() - 0.5) * (grainAmount / 2);
+    data[i] += noise;
+    data[i + 1] += noise;
+    data[i + 2] += noise;
+  }
+  ctx.putImageData(imageData, 0, 0);
+}
+
+
+document.getElementById('grain').addEventListener('input', drawCanvas);
