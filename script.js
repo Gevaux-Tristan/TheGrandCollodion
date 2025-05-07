@@ -1,103 +1,96 @@
 
+const imageInput = document.getElementById("imageUpload");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
-let image = null;
-let texture = new Image();
-texture.src = document.getElementById("textureSelect").value;
+let originalImage = null;
+let textureImage = new Image();
 
-document.getElementById("textureSelect").addEventListener("change", () => {
-  texture.src = document.getElementById("textureSelect").value;
-  texture.onload = render;
-});
+const contrastSlider = document.getElementById("contrastSlider");
+const opacitySlider = document.getElementById("opacitySlider");
+const grainSlider = document.getElementById("grainSlider");
+const textureSelect = document.getElementById("textureSelect");
 
-document.getElementById("imageUpload").addEventListener("change", (e) => {
-  document.getElementById('drop-area').style.display = 'none';
-  const reader = new FileReader();
-  reader.onload = function (event) {
-    image = new Image();
-    image.onload = render;
-    image.src = event.target.result;
-  };
-  reader.readAsDataURL(e.target.files[0]);
-});
+function applyEffects() {
+  if (!originalImage) return;
 
-["contrastSlider", "opacitySlider", "grainSlider"].forEach(id => {
-  document.getElementById(id).addEventListener("input", render);
-});
+  canvas.width = originalImage.width;
+  canvas.height = originalImage.height;
 
-document.getElementById("downloadBtn").addEventListener("click", () => {
-  const link = document.createElement("a");
-  link.download = "collodion_output.jpg";
-  link.href = canvas.toDataURL("image/jpeg");
-  link.click();
-});
+  // Draw base image
+  ctx.drawImage(originalImage, 0, 0);
 
-function applyGrain(imageData, intensity) {
+  // Apply grayscale + contrast
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = imageData.data;
+  const contrast = parseFloat(contrastSlider.value);
+
   for (let i = 0; i < data.length; i += 4) {
-    const grain = (Math.random() - 0.5) * 255 * intensity;
-    data[i] += grain;
-    data[i+1] += grain;
-    data[i+2] += grain;
+    let avg = (data[i] + data[i+1] + data[i+2]) / 3;
+
+    avg = ((avg - 128) * contrast + 128);
+    avg = Math.min(255, Math.max(0, avg));
+
+    data[i] = data[i+1] = data[i+2] = avg;
   }
-  return imageData;
+
+  ctx.putImageData(imageData, 0, 0);
+
+  // Add grain
+  const grainAmount = parseFloat(grainSlider.value);
+  const grainData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  for (let i = 0; i < grainData.data.length; i += 4) {
+    const noise = (Math.random() - 0.5) * 255 * grainAmount;
+    grainData.data[i] += noise;
+    grainData.data[i+1] += noise;
+    grainData.data[i+2] += noise;
+  }
+  ctx.putImageData(grainData, 0, 0);
+
+  // Overlay texture
+  const opacity = parseFloat(opacitySlider.value);
+  if (textureImage.src && textureImage.complete) {
+    ctx.globalAlpha = opacity;
+    ctx.globalCompositeOperation = "overlay";
+    ctx.drawImage(textureImage, 0, 0, canvas.width, canvas.height);
+    ctx.globalAlpha = 1.0;
+    ctx.globalCompositeOperation = "source-over";
+  }
 }
 
-function render() {
-  if (!image) return;
-
-  const contrast = parseFloat(document.getElementById("contrastSlider").value);
-  const opacity = parseFloat(document.getElementById("opacitySlider").value);
-  const grain = parseFloat(document.getElementById("grainSlider").value);
-
-  canvas.width = image.width;
-  canvas.height = image.height;
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.filter = `grayscale(1) contrast(${contrast})`;
-  ctx.drawImage(image, 0, 0);
-
-  ctx.filter = "none";
-  ctx.globalAlpha = opacity;
-  ctx.globalCompositeOperation = "overlay";
-  ctx.drawImage(texture, 0, 0, canvas.width, canvas.height);
-  ctx.globalAlpha = 1;
-  ctx.globalCompositeOperation = "source-over";
-
-  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  ctx.putImageData(applyGrain(imgData, grain), 0, 0);
+function loadImage(file) {
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    const img = new Image();
+    img.onload = function () {
+      originalImage = img;
+      applyEffects();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
 }
 
-const dropArea = document.getElementById("drop-area");
-dropArea.addEventListener("dragover", (e) => {
-  e.preventDefault();
-  dropArea.classList.add("highlight");
-});
-dropArea.addEventListener("dragleave", () => {
-  dropArea.classList.remove("highlight");
-});
-dropArea.addEventListener("drop", (e) => {
-  e.preventDefault();
-  dropArea.classList.remove("highlight");
-  if (e.dataTransfer.files.length > 0) {
-    document.getElementById("imageUpload").files = e.dataTransfer.files;
-    document.getElementById("imageUpload").dispatchEvent(new Event("change"));
+imageInput.addEventListener("change", () => {
+  if (imageInput.files.length > 0) {
+    loadImage(imageInput.files[0]);
   }
 });
-canvas.addEventListener("dragover", (e) => {
+
+document.body.addEventListener("dragover", (e) => {
   e.preventDefault();
 });
-canvas.addEventListener("drop", (e) => {
+document.body.addEventListener("drop", (e) => {
   e.preventDefault();
   if (e.dataTransfer.files.length > 0) {
-    const fileInput = document.getElementById("imageUpload");
-    const dataTransfer = new DataTransfer();
-    dataTransfer.items.add(e.dataTransfer.files[0]);
-    fileInput.files = dataTransfer.files;
-    fileInput.dispatchEvent(new Event("change"));
-    const dropArea = document.getElementById("drop-area");
-    if (dropArea) {
-      dropArea.style.display = "none";
-    }
+    loadImage(e.dataTransfer.files[0]);
   }
+});
+
+[contrastSlider, opacitySlider, grainSlider].forEach(slider => {
+  slider.addEventListener("input", () => applyEffects());
+});
+
+textureSelect.addEventListener("change", () => {
+  textureImage.src = textureSelect.value;
+  textureImage.onload = () => applyEffects();
 });
