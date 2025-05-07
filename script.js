@@ -1,14 +1,14 @@
 
-const imageInput = document.getElementById("imageUpload");
+const imageInput = document.getElementById("upload");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 let originalImage = null;
 let textureImage = new Image();
 
-const contrastSlider = document.getElementById("contrastSlider");
-const opacitySlider = document.getElementById("opacitySlider");
-const grainSlider = document.getElementById("grainSlider");
-const textureSelect = document.getElementById("textureSelect");
+const contrastSlider = document.getElementById("contrast");
+const opacitySlider = document.getElementById("opacity");
+const grainSlider = document.getElementById("grain");
+const textureSelect = document.getElementById("texture");
 
 function applyEffects() {
   if (!originalImage) return;
@@ -16,26 +16,21 @@ function applyEffects() {
   canvas.width = originalImage.width;
   canvas.height = originalImage.height;
 
-  // Draw base image
   ctx.drawImage(originalImage, 0, 0);
 
-  // Apply grayscale + contrast
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = imageData.data;
   const contrast = parseFloat(contrastSlider.value);
 
   for (let i = 0; i < data.length; i += 4) {
     let avg = (data[i] + data[i+1] + data[i+2]) / 3;
-
     avg = ((avg - 128) * contrast + 128);
     avg = Math.min(255, Math.max(0, avg));
-
     data[i] = data[i+1] = data[i+2] = avg;
   }
 
   ctx.putImageData(imageData, 0, 0);
 
-  // Add grain
   const grainAmount = parseFloat(grainSlider.value);
   const grainData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   for (let i = 0; i < grainData.data.length; i += 4) {
@@ -46,7 +41,6 @@ function applyEffects() {
   }
   ctx.putImageData(grainData, 0, 0);
 
-  // Overlay texture
   const opacity = parseFloat(opacitySlider.value);
   if (textureImage.src && textureImage.complete) {
     ctx.globalAlpha = opacity;
@@ -79,6 +73,7 @@ imageInput.addEventListener("change", () => {
 document.body.addEventListener("dragover", (e) => {
   e.preventDefault();
 });
+
 document.body.addEventListener("drop", (e) => {
   e.preventDefault();
   if (e.dataTransfer.files.length > 0) {
@@ -93,4 +88,11 @@ document.body.addEventListener("drop", (e) => {
 textureSelect.addEventListener("change", () => {
   textureImage.src = textureSelect.value;
   textureImage.onload = () => applyEffects();
+});
+
+document.getElementById("download").addEventListener("click", () => {
+  const link = document.createElement("a");
+  link.download = "collodion-image.jpg";
+  link.href = canvas.toDataURL("image/jpeg");
+  link.click();
 });

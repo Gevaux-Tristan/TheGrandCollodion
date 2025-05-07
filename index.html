@@ -1,41 +1,48 @@
-
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>The Grand Collodion</title>
-  <link rel="icon" type="image/png" href="favicon.png" />
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@800&family=DM+Sans&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="favicon.png" type="image/png" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div class="container">
-    <div id="preview">
-      
-
-<canvas id="canvas"></canvas>
-</canvas>
-
+  <div id="main-container">
+    <div id="preview-container">
+      <canvas id="canvas"></canvas>
     </div>
-    <div id="controls"><img src="logo.png" alt="Logo" style="width: 140px; margin-bottom: 20px;">
-<label>Image</label><input type="file" id="imageUpload" accept="image/*" />
-      <label>Contraste</label>
-      <input type="range" id="contrastSlider" min="0.5" max="3" step="0.1" value="2.4" />
-
-      <label>Opacité texture</label>
-      <input type="range" id="opacitySlider" min="0" max="1" step="0.01" value="0.55" />
-
-      <label>Grain</label>
-      <input type="range" id="grainSlider" min="0" max="1" step="0.01" value="0.2" />
-
-      <select id="textureSelect">
-        <option value="collodion-noir.jpeg">Collodion foncé</option><option value="collodion-clair.png">Collodion clair</option><option value="concrete.png">Concrete</option><option value="cracked.jpeg">Craquelé</option><option value="poussiere.jpeg">Poussière</option><option value="vieux-papier.jpeg">Vieux papier</option>
-      </select>
-
-      <label>Image</label>
-      
-
-      <button id="downloadBtn">Télécharger</button>
+    <div id="controls-panel">
+      <img src="logo.png" alt="The Grand Collodion Logo" id="logo" />
+      <label class="upload-label">
+        <input type="file" id="upload" accept="image/*" />
+        Upload your image
+      </label>
+      <div class="control">
+        <label for="contrast">Contrast</label>
+        <input type="range" id="contrast" min="0" max="5" step="0.1" value="2.4" />
+      </div>
+      <div class="control">
+        <label for="opacity">Texture opacity</label>
+        <input type="range" id="opacity" min="0" max="1" step="0.01" value="0.55" />
+      </div>
+      <div class="control">
+        <label for="grain">Grain level</label>
+        <input type="range" id="grain" min="0" max="1" step="0.01" value="0.3" />
+      </div>
+      <div class="control">
+        <label for="texture">Choose your texture :</label>
+        <select id="texture">
+          <option value="collodion-noir.jpeg">Collodion foncé</option>
+          <option value="collodion-clair.png">Collodion clair</option>
+          <option value="concrete.png">Concrete</option>
+          <option value="cracked.jpeg">Cracked</option>
+          <option value="poussiere.jpeg">Poussière</option>
+          <option value="vieux-papier.jpeg">Vieux papier</option>
+        </select>
+      </div>
+      <button id="download">Download your collodion</button>
     </div>
   </div>
   <script src="script.js"></script>

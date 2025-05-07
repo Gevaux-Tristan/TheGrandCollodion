@@ -1,290 +1,144 @@
 
-
 body {
-
   margin: 0;
-
-  padding: 0;
-
-  color: #FED702;
-
   font-family: 'DM Sans', sans-serif;
-
+  background-color: #0F0F0F;
+  color: white;
   display: flex;
-
-  justify-content: center;
-
-  align-items: center;
-
   height: 100vh;
-
+  overflow: hidden;
 }
 
-.container {
-
+#main-container {
   display: flex;
-
-  gap: 40px;
-
-  align-items: center;
-
+  width: 100%;
 }
 
+#preview-container {
+  flex: 1;
   display: flex;
-
   align-items: center;
-
   justify-content: center;
-
+  background-color: black;
 }
 
-canvas {
-
-  max-height: 80vh;
-
-  max-width: 50vw;
-
-  aspect-ratio: auto;
-
+#canvas {
+  max-height: 100vh;
+  object-fit: contain;
 }
 
-#controls {
-
+#controls-panel {
+  width: 320px;
+  padding: 32px 24px;
+  background-color: #0F0F0F;
+  border-left: 1px solid #FED702;
   display: flex;
-
   flex-direction: column;
-
-  gap: 10px;
-
-  font-size: 14px;
-
+  gap: 20px;
 }
 
-input[type=range]::-webkit-slider-thumb {
-
+#logo {
+  width: 200px;
+  margin-bottom: 20px;
 }
 
-button {
-
-  color: #121212;
-
+.upload-label {
+  background-color: #FED702;
+  color: #0F0F0F;
+  padding: 12px;
+  text-align: center;
   font-weight: bold;
-
-  border: none;
-
-  padding: 10px;
-
   cursor: pointer;
+  border-radius: 4px;
+}
 
+.upload-label input {
+  display: none;
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+input[type="range"] {
+  width: 100%;
+  -webkit-appearance: none;
+  height: 6px;
+  background: #333;
+  border-radius: 5px;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #FED702;
+  border-radius: 50%;
+  cursor: pointer;
 }
 
 select {
-
-  color: #FED702;
-
-  padding: 4px;
-
-  font-family: 'DM Sans', sans-serif;
-
+  padding: 8px;
+  border-radius: 4px;
+  background: #111;
+  color: white;
   border: 1px solid #FED702;
-
 }
 
-
-
-  border: 2px dashed #FED702;
-
-  padding: 20px;
-
-  text-align: center;
-
-  color: #FED702;
-
-  font-family: 'DM Sans', sans-serif;
-
-  margin-bottom: 10px;
-
+#download {
+  background-color: #FED702;
+  color: #0F0F0F;
+  border: none;
+  padding: 12px;
+  font-weight: bold;
+  border-radius: 4px;
+  cursor: pointer;
 }
 
-  display: block;
-
-  margin: 10px auto 0;
-
+#controls-panel {
+  width: 320px;
+  padding: 32px 24px;
+  background-color: #0F0F0F;
+  border-left: 1px solid #FED702;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 30px;
 }
 
-  margin: 0;
-
-}
-
-
-
-  border: 2px dashed #FED702;
-
-  padding: 20px;
-
-  text-align: center;
-
-  color: #FED702;
-
-  font-family: 'DM Sans', sans-serif;
-
-  margin-bottom: 10px;
-
-}
-
-}
-
-
-
-
-
-canvas.placeholder {
-
-  width: auto;
-
-  max-height: 80vh;
-
-  aspect-ratio: 4 / 5;
-
-  display: block;
-
+#logo {
+  width: 200px;
   margin: 0 auto;
-
+  display: block;
 }
 
-
-
-
-
-  position: relative;
-
-  width: 320px;
-
-  height: 400px;
-
+.control {
   display: flex;
-
-  align-items: center;
-
-  justify-content: center;
-
-}
-
-
-
+  flex-direction: column;
+  gap: 6px;
   width: 100%;
-
-  height: 100%;
-
-  border: 2px dashed #FED702;
-
 }
 
-
-
-canvas {
-
-  max-height: 80vh;
-
-  max-width: 100%;
-
+.control label {
+  font-size: 13px;
 }
 
-
-
-html, body {
-
-  margin: 0;
-
-  padding: 0;
-
-  width: 100vw;
-
-  height: 100vh;
-
-  color: #FED702;
-
-  font-family: 'DM Sans', sans-serif;
-
-  overflow: hidden;
-
+.upload-label, #download {
+  font-size: 15px;
 }
 
-.container {
-
-  display: flex;
-
-  height: 100vh;
-
-  width: 100vw;
-
+select {
+  font-size: 15px;
 }
 
-  flex: 1;
-
-  display: flex;
-
-  align-items: center;
-
-  justify-content: center;
-
+#download:hover, .upload-label:hover {
+  opacity: 0.9;
+  transform: scale(1.02);
+  transition: all 0.2s ease-in-out;
 }
 
-#controls {
-
-  width: 320px;
-
-  padding: 20px;
-
-  display: flex;
-
-  flex-direction: column;
-
-  gap: 10px;
-
-}
-
-canvas {
-
-  max-height: 90vh;
-
-  max-width: 100%;
-
-  display: block;
-
-}
-
-html, body {
-  margin: 0;
-  padding: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: #121212;
-  color: #FED702;
-  font-family: 'DM Sans', sans-serif;
-  overflow: hidden;
-}
-.container {
-  display: flex;
-  height: 100vh;
-  width: 100vw;
-}
-#preview {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-#controls {
-  width: 320px;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-canvas {
-  max-height: 90vh;
-  max-width: 100%;
-  display: block;
-  background: none;
+#download {
+  width: 100%;
 }
