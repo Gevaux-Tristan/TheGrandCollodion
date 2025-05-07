@@ -142,3 +142,129 @@ select {
 #download {
   width: 100%;
 }
+
+
+/* Ligne jaune sous le logo */
+#logo {
+  width: 200px;
+  margin-bottom: 8px;
+}
+#logo::after {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 2px;
+  background-color: #FED702;
+  margin-top: 12px;
+}
+
+/* Upload en full width */
+.upload-label {
+  width: 100%;
+}
+
+/* Style dropdown jaune + chevron */
+select {
+  font-size: 15px;
+  color: #FED702;
+  background: #111;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #FED702;
+  appearance: none;
+  background-image: url('data:image/svg+xml;utf8,<svg fill="%23FED702" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
+  background-repeat: no-repeat;
+  background-position-x: calc(100% - 10px);
+  background-position-y: center;
+}
+
+/* Icônes dans les boutons */
+.material-icon {
+  font-family: 'Material Icons';
+  font-style: normal;
+  font-weight: normal;
+  font-size: 18px;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+
+/* Boutons harmonisés */
+.upload-label, #download {
+  width: 100%;
+  font-size: 15px;
+  padding: 12px;
+  font-weight: bold;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background-color: #FED702;
+  color: #0F0F0F;
+  border: none;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.upload-label:hover, #download:hover {
+  background-color: #e6c502;
+}
+
+/* Dropdown stylisé */
+select {
+  font-size: 15px;
+  color: #FED702;
+  background: #111;
+  padding: 8px 32px 8px 10px;
+  border-radius: 4px;
+  border: 1px solid #FED702;
+  appearance: none;
+  background-image: url('data:image/svg+xml;utf8,<svg fill="%23FED702" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
+  background-repeat: no-repeat;
+  background-position-x: calc(100% - 10px);
+  background-position-y: center;
+}
+
+/* Option styling (partial, browser-dependent) */
+select option {
+  background-color: #0F0F0F;
+  color: #FED702;
+  border-bottom: 1px solid #FED702;
+}
+
+
+/* Forcer la même largeur exacte pour les deux boutons */
+.upload-label, #download {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Stylisation avancée du menu déroulant ouvert */
+select {
+  font-size: 15px;
+  color: #FED702;
+  background-color: #0F0F0F;
+  border: 1px solid #FED702;
+  border-radius: 4px;
+  padding: 8px 32px 8px 10px;
+  appearance: none;
+  background-image: url('data:image/svg+xml;utf8,<svg fill="%23FED702" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
+  background-repeat: no-repeat;
+  background-position-x: calc(100% - 10px);
+  background-position-y: center;
+}
+
+select:focus {
+  outline: none;
+  border-color: #FED702;
+  box-shadow: 0 0 0 2px rgba(254, 215, 2, 0.3);
+}
+
+/* Les options dans le dropdown */
+select option {
+  background-color: #0F0F0F;
+  color: #FED702;
+  border-bottom: 1px solid #333;
+}
