@@ -91,13 +91,34 @@ select {
 }
 
 #download {
-  background-color: #FFBF00;
-  color: #0F0F0F;
-  border: none;
+  background-color: transparent;
+  color: #FFBF00;
+  border: 2px solid #FFBF00;
   padding: 12px;
   font-weight: bold;
   border-radius: 4px;
   cursor: pointer;
+  width: 100%;
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease-in-out;
+}
+
+#download .material-icon {
+  color: #FFBF00;
+  transition: color 0.2s ease-in-out;
+}
+
+#download:hover {
+  background-color: #FFBF00;
+  color: #0F0F0F;
+}
+
+#download:hover .material-icon {
+  color: #0F0F0F;
 }
 
 #controls-panel {
@@ -204,15 +225,17 @@ select {
   align-items: center;
   justify-content: center;
   gap: 8px;
+}
+
+.upload-label {
   background-color: #FFBF00;
   color: #0F0F0F;
   border: none;
   transition: background-color 0.2s ease-in-out;
 }
 
-.upload-label:hover, #download:hover {
+.upload-label:hover {
   background-color: #e6ac00;
-  color: #0F0F0F;
 }
 
 /* Dropdown stylisé */
