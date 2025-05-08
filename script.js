@@ -346,6 +346,8 @@ function handleDrop(e) {
 }
 
 // Gestion du menu déroulant personnalisé
+// Version robuste : ouverture/fermeture uniquement sur .selected, fermeture garantie à la sélection
+
 document.addEventListener('DOMContentLoaded', function() {
   const customSelect = document.querySelector('.custom-select');
   const select = document.querySelector('#texture');
@@ -355,17 +357,19 @@ document.addEventListener('DOMContentLoaded', function() {
   selected.textContent = select.options[select.selectedIndex].text;
   customSelect.insertBefore(selected, customSelect.firstChild);
 
-  customSelect.addEventListener('click', function(e) {
-    this.classList.toggle('active');
+  // Ouvre/ferme le menu uniquement si on clique sur .selected
+  selected.addEventListener('click', function(e) {
+    e.stopPropagation();
+    customSelect.classList.toggle('active');
   });
 
   options.forEach(option => {
-    option.addEventListener('click', function() {
+    option.addEventListener('click', function(e) {
+      e.stopPropagation();
       const value = this.getAttribute('data-value');
       select.value = value;
       selected.textContent = this.textContent;
       customSelect.classList.remove('active');
-      
       // Déclencher l'événement change sur le select original
       const event = new Event('change');
       select.dispatchEvent(event);

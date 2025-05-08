@@ -522,8 +522,9 @@ select option {
 }
 
 .option {
+  color: #fff !important;
+  background-color: #0F0F0F !important;
   padding: 12px;
-  color: #FFBF00;
   cursor: pointer;
   font-weight: bold;
   border-bottom: 1px solid #FFBF00;
@@ -555,4 +556,67 @@ select option {
 .custom-select, .custom-select .selected {
   width: 100%;
   box-sizing: border-box;
+}
+
+@media (max-width: 900px) {
+  #main-container {
+    flex-direction: column;
+  }
+  #preview-container {
+    width: 100%;
+    min-height: 300px;
+    height: 40vh;
+    border-right: none;
+    border-bottom: 1px solid #FFBF00;
+  }
+  #controls-panel {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid #FFBF00;
+    padding: 24px 8px;
+    gap: 20px;
+    padding-left: 4vw;
+    padding-right: 4vw;
+  }
+  .custom-select, .custom-select .selected, .upload-label, #download {
+    font-size: 17px;
+    padding: 16px;
+  }
+  .select-options, .option {
+    font-size: 17px;
+    padding: 16px;
+  }
+  #drag-message {
+    display: none !important;
+  }
+}
+
+@media (max-width: 600px) {
+  #main-container {
+    flex-direction: column;
+  }
+  #preview-container {
+    min-height: 180px;
+    height: 32vh;
+  }
+  #controls-panel {
+    padding: 12px 2vw;
+    gap: 14px;
+    padding-left: 3vw;
+    padding-right: 3vw;
+  }
+  .custom-select, .custom-select .selected, .upload-label, #download {
+    font-size: 15px;
+    padding: 12px;
+  }
+  .select-options, .option {
+    font-size: 15px;
+    padding: 12px;
+  }
+  #logo {
+    width: 140px;
+  }
+  .control label {
+    font-size: 12px;
+  }
 }
