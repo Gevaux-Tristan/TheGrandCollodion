@@ -344,3 +344,38 @@ function handleDrop(e) {
     loadImage(files[0]);
   }
 }
+
+// Gestion du menu déroulant personnalisé
+document.addEventListener('DOMContentLoaded', function() {
+  const customSelect = document.querySelector('.custom-select');
+  const select = document.querySelector('#texture');
+  const options = document.querySelectorAll('.option');
+  const selected = document.createElement('div');
+  selected.className = 'selected';
+  selected.textContent = select.options[select.selectedIndex].text;
+  customSelect.insertBefore(selected, customSelect.firstChild);
+
+  customSelect.addEventListener('click', function(e) {
+    this.classList.toggle('active');
+  });
+
+  options.forEach(option => {
+    option.addEventListener('click', function() {
+      const value = this.getAttribute('data-value');
+      select.value = value;
+      selected.textContent = this.textContent;
+      customSelect.classList.remove('active');
+      
+      // Déclencher l'événement change sur le select original
+      const event = new Event('change');
+      select.dispatchEvent(event);
+    });
+  });
+
+  // Fermer le menu si on clique en dehors
+  document.addEventListener('click', function(e) {
+    if (!customSelect.contains(e.target)) {
+      customSelect.classList.remove('active');
+    }
+  });
+});
