@@ -15,10 +15,25 @@ const grainSlider = document.getElementById("grain");
 const exposureSlider = document.getElementById("exposure");
 const radialBlurSlider = document.getElementById("radialBlur");
 const textureSelect = document.getElementById("texture");
+const customSelect = document.querySelector('.custom-select');
+const selectOptions = document.querySelector('.select-options');
 
 // Initialize texture and opacity
 textureImage.src = "Collodion-01.png";
 opacitySlider.value = "0.75"; // Increased default opacity
+
+// Update select options visibility when opening the dropdown
+customSelect.addEventListener('click', function() {
+  const selectedValue = textureSelect.value;
+  const options = selectOptions.querySelectorAll('.option');
+  options.forEach(option => {
+    if (option.dataset.value === selectedValue) {
+      option.style.display = 'none';
+    } else {
+      option.style.display = 'block';
+    }
+  });
+});
 
 // Debounce function with immediate option
 function debounce(func, wait, immediate = false) {
@@ -361,6 +376,16 @@ document.addEventListener('DOMContentLoaded', function() {
   selected.addEventListener('click', function(e) {
     e.stopPropagation();
     customSelect.classList.toggle('active');
+    
+    // Mettre à jour la visibilité des options
+    const currentValue = select.value;
+    options.forEach(option => {
+      if (option.getAttribute('data-value') === currentValue) {
+        option.style.display = 'none';
+      } else {
+        option.style.display = 'block';
+      }
+    });
   });
 
   options.forEach(option => {
