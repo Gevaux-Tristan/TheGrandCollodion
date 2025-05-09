@@ -75,13 +75,13 @@ function applyPreviewEffects() {
       cachedImageData = previewCtx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
     }
 
-  canvas.width = originalImage.width;
-  canvas.height = originalImage.height;
+    canvas.width = originalImage.width;
+    canvas.height = originalImage.height;
     ctx.putImageData(cachedImageData, 0, 0);
 
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = imageData.data;
-  const contrast = parseFloat(contrastSlider.value);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    const contrast = parseFloat(contrastSlider.value);
     const exposure = parseFloat(exposureSlider.value);
 
     // Fast contrast and exposure calculation
@@ -95,99 +95,53 @@ function applyPreviewEffects() {
     }
 
     // Apply lookup table
-  for (let i = 0; i < data.length; i += 4) {
+    for (let i = 0; i < data.length; i += 4) {
       data[i] = lut[data[i]];
       data[i+1] = lut[data[i+1]];
       data[i+2] = lut[data[i+2]];
-  }
+    }
 
-  ctx.putImageData(imageData, 0, 0);
+    ctx.putImageData(imageData, 0, 0);
 
     const radialBlur = parseFloat(radialBlurSlider.value);
     if (radialBlur > 0) {
-      // Create a temporary canvas for the blur
-      previewCtx.drawImage(canvas, 0, 0);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      applyRadialBlur(ctx, previewCanvas, radialBlur);
+    }
+
+    const grainAmount = parseFloat(grainSlider.value);
+    if (grainAmount > 0) {
+      const grainData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const noise = new Uint8ClampedArray(grainData.data.length);
       
-      // Draw original image first
-      ctx.globalAlpha = 1;
-      ctx.drawImage(previewCanvas, 0, 0);
+      // Optimiser le grain sur mobile
+      const isMobile = window.innerWidth <= 900;
+      const grainStep = isMobile ? 8 : 4; // Traiter moins de pixels sur mobile
       
-      // Calculate center point
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-      
-      // Improved blur parameters for smoother transitions
-      const steps = Math.min(8, Math.ceil(radialBlur));
-      const baseDistance = radialBlur * 0.4; // Increased base distance for stronger maximum blur
-      
-      // Apply blur in two passes for smoother transition
-      for (let pass = 0; pass < 2; pass++) {
-        for (let i = 0; i < steps; i++) {
-          const angle = (i / steps) * Math.PI * 2;
-          
-          // Smooth distance calculation
-          const progress = i / steps;
-          const smoothProgress = 0.5 - Math.cos(progress * Math.PI) * 0.5;
-          const distance = baseDistance * smoothProgress;
-          
-          const offsetX = Math.cos(angle) * distance;
-          const offsetY = Math.sin(angle) * distance;
-          
-          // Smoother alpha calculation with cubic easing
-          const alpha = (1 - Math.pow(progress, 3)) / (steps * 2);
-          ctx.globalAlpha = alpha * 1.2; // Slightly increased alpha for stronger effect
-          
-          ctx.drawImage(previewCanvas, offsetX, offsetY);
+      for (let i = 0; i < noise.length; i += grainStep) {
+        const n = (Math.random() - 0.5) * 255 * grainAmount;
+        for (let j = 0; j < grainStep && i + j < noise.length; j += 4) {
+          noise[i + j] = noise[i + j + 1] = noise[i + j + 2] = n;
         }
       }
       
-      // Very subtle center reinforcement
-      if (radialBlur > 2) {
-        ctx.globalAlpha = 0.12; // Slightly increased center reinforcement
-        ctx.drawImage(previewCanvas, 0, 0);
+      for (let i = 0; i < grainData.data.length; i += grainStep) {
+        for (let j = 0; j < grainStep && i + j < grainData.data.length; j += 4) {
+          grainData.data[i + j] = Math.min(255, Math.max(0, grainData.data[i + j] + noise[i + j]));
+          grainData.data[i + j + 1] = Math.min(255, Math.max(0, grainData.data[i + j + 1] + noise[i + j + 1]));
+          grainData.data[i + j + 2] = Math.min(255, Math.max(0, grainData.data[i + j + 2] + noise[i + j + 2]));
+        }
       }
-      
-      // Minimal brightness compensation
-      const finalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = finalImageData.data;
-      const brightnessFactor = 1 + (radialBlur * 0.003);
-      
-      for (let i = 0; i < data.length; i += 4) {
-        data[i] = Math.min(255, data[i] * brightnessFactor);
-        data[i+1] = Math.min(255, data[i+1] * brightnessFactor);
-        data[i+2] = Math.min(255, data[i+2] * brightnessFactor);
-      }
-      
-      ctx.putImageData(finalImageData, 0, 0);
-      ctx.globalAlpha = 1.0;
+      ctx.putImageData(grainData, 0, 0);
     }
 
-  const grainAmount = parseFloat(grainSlider.value);
-    if (grainAmount > 0) {
-  const grainData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const noise = new Uint8ClampedArray(grainData.data.length);
-      for (let i = 0; i < noise.length; i += 4) {
-        const n = (Math.random() - 0.5) * 255 * grainAmount;
-        noise[i] = noise[i+1] = noise[i+2] = n;
-      }
-      
-  for (let i = 0; i < grainData.data.length; i += 4) {
-        grainData.data[i] = Math.min(255, Math.max(0, grainData.data[i] + noise[i]));
-        grainData.data[i+1] = Math.min(255, Math.max(0, grainData.data[i+1] + noise[i+1]));
-        grainData.data[i+2] = Math.min(255, Math.max(0, grainData.data[i+2] + noise[i+2]));
-  }
-  ctx.putImageData(grainData, 0, 0);
-    }
-
-  const opacity = parseFloat(opacitySlider.value);
+    const opacity = parseFloat(opacitySlider.value);
     if (textureImage.src && textureImage.complete && opacity > 0) {
-    ctx.globalAlpha = opacity;
-    ctx.globalCompositeOperation = "overlay";
-    ctx.drawImage(textureImage, 0, 0, canvas.width, canvas.height);
-    ctx.globalAlpha = 1.0;
-    ctx.globalCompositeOperation = "source-over";
-  }
+      ctx.globalAlpha = opacity;
+      ctx.globalCompositeOperation = "overlay";
+      ctx.drawImage(textureImage, 0, 0, canvas.width, canvas.height);
+      ctx.globalAlpha = 1.0;
+      ctx.globalCompositeOperation = "source-over";
+    }
 
     isProcessing = false;
     if (needsUpdate) {
@@ -197,11 +151,10 @@ function applyPreviewEffects() {
   });
 }
 
-// Create debounced version of applyEffects with immediate option for better responsiveness
-const debouncedApplyEffects = debounce(applyPreviewEffects, 16, true);
-
-// Create separate debounce for radial blur with longer delay
-const debouncedRadialBlur = debounce(applyPreviewEffects, 32, true); // 32ms for smoother blur
+// Augmenter le délai de debounce sur mobile
+const debounceDelay = window.innerWidth <= 900 ? 32 : 16;
+const debouncedApplyEffects = debounce(applyPreviewEffects, debounceDelay, true);
+const debouncedRadialBlur = debounce(applyPreviewEffects, debounceDelay * 2, true);
 
 function loadImage(file) {
   const reader = new FileReader();
@@ -215,7 +168,9 @@ function loadImage(file) {
       // Calculate new dimensions while maintaining aspect ratio
       let newWidth = img.width;
       let newHeight = img.height;
-      const MAX_DIMENSION = 1500; // Maximum dimension for preview
+      
+      // Réduire la taille maximale sur mobile
+      const MAX_DIMENSION = window.innerWidth <= 900 ? 800 : 1500;
       
       if (img.width > MAX_DIMENSION || img.height > MAX_DIMENSION) {
         if (img.width > img.height) {
@@ -234,7 +189,7 @@ function loadImage(file) {
       // Draw and compress image
       tempCtx.drawImage(img, 0, 0, newWidth, newHeight);
       
-      // Create compressed image
+      // Create compressed image with lower quality on mobile
       const compressedImg = new Image();
       compressedImg.onload = function() {
         originalImage = compressedImg;
@@ -244,7 +199,9 @@ function loadImage(file) {
         // Apply effects with current settings
         applyPreviewEffects();
       };
-      compressedImg.src = tempCanvas.toDataURL('image/jpeg', 0.7); // Compress to 70% quality
+      // Réduire la qualité sur mobile
+      const quality = window.innerWidth <= 900 ? 0.5 : 0.7;
+      compressedImg.src = tempCanvas.toDataURL('image/jpeg', quality);
     };
     img.src = e.target.result;
   };
@@ -408,3 +365,61 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 });
+
+// Optimisation du flou radial pour mobile
+function applyRadialBlur(ctx, previewCanvas, radialBlur) {
+  if (radialBlur <= 0) return;
+  
+  // Réduire le nombre d'étapes sur mobile
+  const isMobile = window.innerWidth <= 900;
+  const steps = isMobile ? Math.min(4, Math.ceil(radialBlur)) : Math.min(8, Math.ceil(radialBlur));
+  const baseDistance = radialBlur * (isMobile ? 0.3 : 0.4);
+  
+  // Create a temporary canvas for the blur
+  previewCtx.drawImage(canvas, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // Draw original image first
+  ctx.globalAlpha = 1;
+  ctx.drawImage(previewCanvas, 0, 0);
+  
+  // Apply blur in one pass on mobile, two passes on desktop
+  const passes = isMobile ? 1 : 2;
+  
+  for (let pass = 0; pass < passes; pass++) {
+    for (let i = 0; i < steps; i++) {
+      const angle = (i / steps) * Math.PI * 2;
+      const progress = i / steps;
+      const smoothProgress = 0.5 - Math.cos(progress * Math.PI) * 0.5;
+      const distance = baseDistance * smoothProgress;
+      
+      const offsetX = Math.cos(angle) * distance;
+      const offsetY = Math.sin(angle) * distance;
+      
+      const alpha = (1 - Math.pow(progress, 3)) / (steps * passes);
+      ctx.globalAlpha = alpha * 1.2;
+      
+      ctx.drawImage(previewCanvas, offsetX, offsetY);
+    }
+  }
+  
+  // Very subtle center reinforcement
+  if (radialBlur > 2) {
+    ctx.globalAlpha = isMobile ? 0.08 : 0.12;
+    ctx.drawImage(previewCanvas, 0, 0);
+  }
+  
+  // Minimal brightness compensation
+  const finalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = finalImageData.data;
+  const brightnessFactor = 1 + (radialBlur * 0.003);
+  
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = Math.min(255, data[i] * brightnessFactor);
+    data[i+1] = Math.min(255, data[i+1] * brightnessFactor);
+    data[i+2] = Math.min(255, data[i+2] * brightnessFactor);
+  }
+  
+  ctx.putImageData(finalImageData, 0, 0);
+  ctx.globalAlpha = 1.0;
+}

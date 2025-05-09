@@ -111,15 +111,52 @@ input[type="range"] {
   border-radius: 5px;
   outline: none;
   box-sizing: border-box;
+  pointer-events: none;
 }
 
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 24px;
+  height: 24px;
   background: #FFBF00;
   border-radius: 50%;
   cursor: pointer;
+  pointer-events: auto;
+  border: 2px solid #0F0F0F;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Style pour Firefox */
+input[type="range"]::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  background: #FFBF00;
+  border-radius: 50%;
+  cursor: pointer;
+  pointer-events: auto;
+  border: 2px solid #0F0F0F;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Style pour Edge */
+input[type="range"]::-ms-thumb {
+  width: 24px;
+  height: 24px;
+  background: #FFBF00;
+  border-radius: 50%;
+  cursor: pointer;
+  pointer-events: auto;
+  border: 2px solid #0F0F0F;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Désactive les interactions sur la piste pour tous les navigateurs */
+input[type="range"]::-moz-range-track {
+  pointer-events: none;
+}
+
+input[type="range"]::-ms-track {
+  pointer-events: none;
 }
 
 /* Style du select */
