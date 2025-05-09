@@ -640,17 +640,17 @@ select option {
     padding: 20px 24px;
     border-left: none;
     border-top: 1px solid #FFBF00;
-    gap: 20px;
+    gap: 30px;
     min-height: 10vh;
   }
 
   .control {
-    gap: 6px;
-    margin-bottom: 5px;
+    gap: 10px;
+    margin-bottom: 10px;
   }
 
   .custom-select .selected, .option {
-    padding: 12px;
+    padding: 14px;
   }
 
   #drag-message {
@@ -673,18 +673,18 @@ select option {
   }
 
   #controls-panel {
-    padding: 16px 20px;
-    gap: 17px;
+    padding: 20px;
+    gap: 25px;
     min-height: 10vh;
   }
 
   .control {
-    gap: 5px;
-    margin-bottom: 7px;
+    gap: 8px;
+    margin-bottom: 12px;
   }
 
   .custom-select .selected, .option {
-    padding: 12px;
+    padding: 16px;
   }
 
   #logo {
