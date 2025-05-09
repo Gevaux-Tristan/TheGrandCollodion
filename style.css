@@ -514,7 +514,6 @@ select option {
   border-style: dashed;
   border-width: 2px;
   border-spacing: 20px;
-  border-dash-pattern: 20px 20px;
 }
 
 #drag-message .material-icon {

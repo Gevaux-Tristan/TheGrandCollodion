@@ -250,21 +250,19 @@ document.getElementById("download").addEventListener("click", () => {
   finalCtx.imageSmoothingEnabled = true;
   finalCtx.imageSmoothingQuality = 'high';
   
-  // Draw the original image at high resolution
-  finalCtx.drawImage(originalImage, 0, 0, finalCanvas.width, finalCanvas.height);
+  // Draw the current canvas at high resolution
+  finalCtx.drawImage(canvas, 0, 0, finalCanvas.width, finalCanvas.height);
   
-  // Convert to black and white
+  // Apply all effects at full quality on the high-res canvas
   const imageData = finalCtx.getImageData(0, 0, finalCanvas.width, finalCanvas.height);
   const data = imageData.data;
-  for (let i = 0; i < data.length; i += 4) {
-    const avg = (data[i] + data[i+1] + data[i+2]) / 3;
-    data[i] = data[i+1] = data[i+2] = avg;
-  }
-  finalCtx.putImageData(imageData, 0, 0);
-
-  // Apply contrast and exposure at full quality
   const contrast = parseFloat(contrastSlider.value);
   const exposure = parseFloat(exposureSlider.value);
+  const radialBlur = parseFloat(radialBlurSlider.value);
+  const grainAmount = parseFloat(grainSlider.value);
+  const opacity = parseFloat(opacitySlider.value);
+
+  // Apply contrast and exposure at full quality
   const contrastFactor = contrast;
   const exposureFactor = Math.pow(2, exposure);
   const lut = new Uint8ClampedArray(256);
@@ -273,17 +271,15 @@ document.getElementById("download").addEventListener("click", () => {
     lut[i] = Math.min(255, Math.max(0, ((i - 128) * contrastFactor + 128) * exposureFactor));
   }
 
-  const finalImageData = finalCtx.getImageData(0, 0, finalCanvas.width, finalCanvas.height);
-  const finalData = finalImageData.data;
-  for (let i = 0; i < finalData.length; i += 4) {
-    finalData[i] = lut[finalData[i]];
-    finalData[i+1] = lut[finalData[i+1]];
-    finalData[i+2] = lut[finalData[i+2]];
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = lut[data[i]];
+    data[i+1] = lut[data[i+1]];
+    data[i+2] = lut[data[i+2]];
   }
-  finalCtx.putImageData(finalImageData, 0, 0);
+  
+  finalCtx.putImageData(imageData, 0, 0);
 
   // Apply radial blur at full quality
-  const radialBlur = parseFloat(radialBlurSlider.value);
   if (radialBlur > 0) {
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = finalCanvas.width;
@@ -321,7 +317,6 @@ document.getElementById("download").addEventListener("click", () => {
   }
 
   // Apply grain at full quality
-  const grainAmount = parseFloat(grainSlider.value);
   if (grainAmount > 0) {
     const grainData = finalCtx.getImageData(0, 0, finalCanvas.width, finalCanvas.height);
     const noise = new Uint8ClampedArray(grainData.data.length);
@@ -340,7 +335,6 @@ document.getElementById("download").addEventListener("click", () => {
   }
 
   // Apply texture at full quality
-  const opacity = parseFloat(opacitySlider.value);
   if (textureImage.src && textureImage.complete && opacity > 0) {
     finalCtx.globalAlpha = opacity;
     finalCtx.globalCompositeOperation = "overlay";
