@@ -31,6 +31,7 @@ body {
   overflow-x: hidden;
   position: relative;
   padding-bottom: 0;
+  min-height: 100vh;
 }
 
 #preview-container {
@@ -64,6 +65,8 @@ body {
   gap: 30px;
   box-sizing: border-box;
   max-width: 100%;
+  height: auto;
+  min-height: 100vh;
 }
 
 #logo {
@@ -660,7 +663,7 @@ select option {
     height: auto;
     min-height: 100vh;
     overflow-y: auto;
-    padding-bottom: 40px;
+    padding-bottom: 0;
   }
 
   #preview-container {
@@ -677,8 +680,9 @@ select option {
     border-left: none;
     border-top: 1px solid #FFBF00;
     gap: 30px;
-    min-height: 10vh;
-    padding-bottom: 120px;
+    height: auto;
+    min-height: auto;
+    padding-bottom: 50px;
   }
 
   .control {
@@ -702,7 +706,7 @@ select option {
 
 @media (max-width: 600px) {
   #main-container {
-    padding-bottom: 40px;
+    padding-bottom: 0;
   }
 
   #preview-container {
@@ -713,8 +717,9 @@ select option {
   #controls-panel {
     padding: 20px;
     gap: 25px;
-    min-height: 10vh;
-    padding-bottom: 140px;
+    height: auto;
+    min-height: auto;
+    padding-bottom: 50px;
   }
 
   .control {
@@ -727,7 +732,8 @@ select option {
   }
 
   #logo {
-    width: 160px;
+    width: 80%;
+    max-width: 80%;
   }
 
   .control label {
