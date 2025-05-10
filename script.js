@@ -251,7 +251,7 @@ document.getElementById("download").addEventListener("click", async () => {
   try {
     // Calculer la taille optimale pour Instagram (minimum 1080px sur le côté le plus long)
     const maxDimension = Math.max(canvas.width, canvas.height);
-    const scale = maxDimension < 1080 ? 1080 / maxDimension : 1;
+    const scale = maxDimension < 1080 ? (1080 / maxDimension) * 2 : 2; // Doublé l'échelle
     
     const finalCanvas = document.createElement('canvas');
     finalCanvas.width = canvas.width * scale;
@@ -362,11 +362,11 @@ document.getElementById("download").addEventListener("click", async () => {
     downloadButton.innerHTML = '<span class="material-icon">file_download</span>Downloading...';
     
     // Optimiser la qualité de l'image
-    let quality = 0.85; // Qualité initiale plus élevée
+    let quality = 0.9; // Augmenté de 0.85 à 0.9
     let dataUrl = finalCanvas.toDataURL("image/jpeg", quality);
     
     // Ajuster la qualité si nécessaire pour rester sous 4 Mo
-    while (dataUrl.length > 4 * 1024 * 1024 && quality > 0.6) {
+    while (dataUrl.length > 4 * 1024 * 1024 && quality > 0.7) { // Augmenté le minimum de 0.6 à 0.7
       quality -= 0.05;
       dataUrl = finalCanvas.toDataURL("image/jpeg", quality);
     }
