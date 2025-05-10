@@ -244,27 +244,27 @@ document.getElementById("download").addEventListener("click", async () => {
   const downloadButton = document.getElementById("download");
   const originalText = downloadButton.innerHTML;
   
-  // Désactiver le bouton et montrer l'indicateur de chargement
   downloadButton.disabled = true;
   downloadButton.innerHTML = '<span class="material-icon">hourglass_empty</span>Processing...';
   downloadButton.style.opacity = '0.7';
   
   try {
-    // Create a high-resolution canvas for export
+    // Calculer la taille optimale pour Instagram (minimum 1080px sur le côté le plus long)
+    const maxDimension = Math.max(canvas.width, canvas.height);
+    const scale = maxDimension < 1080 ? 1080 / maxDimension : 1;
+    
     const finalCanvas = document.createElement('canvas');
-    const scale = 2; // Réduit de 5 à 2 pour diminuer la taille
     finalCanvas.width = canvas.width * scale;
     finalCanvas.height = canvas.height * scale;
     const finalCtx = finalCanvas.getContext('2d');
     
-    // Enable high-quality image scaling
     finalCtx.imageSmoothingEnabled = true;
     finalCtx.imageSmoothingQuality = 'high';
     
-    // Draw the current canvas at high resolution
+    // Dessiner l'image avec la nouvelle échelle
     finalCtx.drawImage(canvas, 0, 0, finalCanvas.width, finalCanvas.height);
     
-    // Apply all effects at full quality on the high-res canvas
+    // Appliquer les effets
     const imageData = finalCtx.getImageData(0, 0, finalCanvas.width, finalCanvas.height);
     const data = imageData.data;
     const contrast = parseFloat(contrastSlider.value);
@@ -273,7 +273,7 @@ document.getElementById("download").addEventListener("click", async () => {
     const grainAmount = parseFloat(grainSlider.value);
     const opacity = parseFloat(opacitySlider.value);
 
-    // Apply contrast and exposure at full quality
+    // Appliquer contraste et exposition
     const contrastFactor = contrast;
     const exposureFactor = Math.pow(2, exposure);
     const lut = new Uint8ClampedArray(256);
@@ -290,7 +290,7 @@ document.getElementById("download").addEventListener("click", async () => {
     
     finalCtx.putImageData(imageData, 0, 0);
 
-    // Apply radial blur at full quality
+    // Appliquer le flou radial de manière optimisée
     if (radialBlur > 0) {
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = finalCanvas.width;
@@ -301,51 +301,51 @@ document.getElementById("download").addEventListener("click", async () => {
       finalCtx.clearRect(0, 0, finalCanvas.width, finalCanvas.height);
       finalCtx.drawImage(tempCanvas, 0, 0);
       
-      const steps = Math.min(16, Math.ceil(radialBlur * 2));
-      const baseDistance = radialBlur * 0.4;
+      const steps = Math.min(8, Math.ceil(radialBlur)); // Réduit le nombre d'étapes
+      const baseDistance = radialBlur * 0.3;
       
-      for (let pass = 0; pass < 3; pass++) {
-        for (let i = 0; i < steps; i++) {
-          const angle = (i / steps) * Math.PI * 2;
-          const progress = i / steps;
-          const smoothProgress = 0.5 - Math.cos(progress * Math.PI) * 0.5;
-          const distance = baseDistance * smoothProgress;
-          
-          const offsetX = Math.cos(angle) * distance;
-          const offsetY = Math.sin(angle) * distance;
-          
-          const alpha = (1 - Math.pow(progress, 3)) / (steps * 3);
-          finalCtx.globalAlpha = alpha * 1.2;
-          
-          finalCtx.drawImage(tempCanvas, offsetX, offsetY);
-        }
-      }
-      
-      if (radialBlur > 2) {
-        finalCtx.globalAlpha = 0.15;
-        finalCtx.drawImage(tempCanvas, 0, 0);
+      for (let i = 0; i < steps; i++) {
+        const angle = (i / steps) * Math.PI * 2;
+        const progress = i / steps;
+        const smoothProgress = 0.5 - Math.cos(progress * Math.PI) * 0.5;
+        const distance = baseDistance * smoothProgress;
+        
+        const offsetX = Math.cos(angle) * distance;
+        const offsetY = Math.sin(angle) * distance;
+        
+        const alpha = (1 - Math.pow(progress, 2)) / steps;
+        finalCtx.globalAlpha = alpha;
+        
+        finalCtx.drawImage(tempCanvas, offsetX, offsetY);
       }
     }
 
-    // Apply grain at full quality
+    // Appliquer le grain de manière optimisée
     if (grainAmount > 0) {
       const grainData = finalCtx.getImageData(0, 0, finalCanvas.width, finalCanvas.height);
-      const noise = new Uint8ClampedArray(grainData.data.length);
+      const data = grainData.data;
+      const noise = new Uint8ClampedArray(data.length);
       
-      for (let i = 0; i < noise.length; i += 4) {
+      // Optimiser le grain en traitant moins de pixels
+      const step = 4;
+      for (let i = 0; i < noise.length; i += step) {
         const n = (Math.random() - 0.5) * 255 * grainAmount;
-        noise[i] = noise[i+1] = noise[i+2] = n;
+        for (let j = 0; j < step && i + j < noise.length; j += 4) {
+          noise[i + j] = noise[i + j + 1] = noise[i + j + 2] = n;
+        }
       }
       
-      for (let i = 0; i < grainData.data.length; i += 4) {
-        grainData.data[i] = Math.min(255, Math.max(0, grainData.data[i] + noise[i]));
-        grainData.data[i+1] = Math.min(255, Math.max(0, grainData.data[i+1] + noise[i+1]));
-        grainData.data[i+2] = Math.min(255, Math.max(0, grainData.data[i+2] + noise[i+2]));
+      for (let i = 0; i < data.length; i += step) {
+        for (let j = 0; j < step && i + j < data.length; j += 4) {
+          data[i + j] = Math.min(255, Math.max(0, data[i + j] + noise[i + j]));
+          data[i + j + 1] = Math.min(255, Math.max(0, data[i + j + 1] + noise[i + j + 1]));
+          data[i + j + 2] = Math.min(255, Math.max(0, data[i + j + 2] + noise[i + j + 2]));
+        }
       }
       finalCtx.putImageData(grainData, 0, 0);
     }
 
-    // Apply texture at full quality
+    // Appliquer la texture
     if (textureImage.src && textureImage.complete && opacity > 0) {
       finalCtx.globalAlpha = opacity;
       finalCtx.globalCompositeOperation = "overlay";
@@ -354,33 +354,28 @@ document.getElementById("download").addEventListener("click", async () => {
       finalCtx.globalCompositeOperation = "source-over";
     }
 
-    // Get the next sequential number from localStorage
     let imageNumber = parseInt(localStorage.getItem('lastImageNumber') || '0') + 1;
     localStorage.setItem('lastImageNumber', imageNumber.toString());
     
-    // Create filename with sequential number
-    const filename = `TheGrandCollodion${imageNumber}.png`;
+    const filename = `TheGrandCollodion${imageNumber}.jpg`;
     
-    // Mettre à jour le bouton pour indiquer que le téléchargement va commencer
     downloadButton.innerHTML = '<span class="material-icon">file_download</span>Downloading...';
     
-    // Optimiser la qualité de l'image pour réduire la taille
-    let quality = 0.8; // Qualité initiale
+    // Optimiser la qualité de l'image
+    let quality = 0.85; // Qualité initiale plus élevée
     let dataUrl = finalCanvas.toDataURL("image/jpeg", quality);
     
-    // Vérifier la taille et ajuster la qualité si nécessaire
-    while (dataUrl.length > 4 * 1024 * 1024 && quality > 0.5) { // 4 Mo en octets
-      quality -= 0.1;
+    // Ajuster la qualité si nécessaire pour rester sous 4 Mo
+    while (dataUrl.length > 4 * 1024 * 1024 && quality > 0.6) {
+      quality -= 0.05;
       dataUrl = finalCanvas.toDataURL("image/jpeg", quality);
     }
     
-    // Export as JPEG with optimized quality
     const link = document.createElement("a");
-    link.download = filename.replace('.png', '.jpg');
+    link.download = filename;
     link.href = dataUrl;
     link.click();
     
-    // Réinitialiser le bouton après un court délai
     setTimeout(() => {
       downloadButton.disabled = false;
       downloadButton.innerHTML = originalText;
@@ -389,7 +384,6 @@ document.getElementById("download").addEventListener("click", async () => {
     
   } catch (error) {
     console.error('Error during image processing:', error);
-    // En cas d'erreur, réinitialiser le bouton
     downloadButton.disabled = false;
     downloadButton.innerHTML = originalText;
     downloadButton.style.opacity = '1';
