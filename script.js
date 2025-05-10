@@ -17,6 +17,8 @@ const radialBlurSlider = document.getElementById("radialBlur");
 const textureSelect = document.getElementById("texture");
 const customSelect = document.querySelector('.custom-select');
 const selectOptions = document.querySelector('.select-options');
+const settingsToggle = document.querySelector('.settings-toggle');
+const settingsContent = document.querySelector('.settings-content');
 
 // Initialize texture and opacity
 textureImage.src = "Collodion-01.png";
@@ -250,7 +252,7 @@ document.getElementById("download").addEventListener("click", async () => {
   try {
     // Create a high-resolution canvas for export
     const finalCanvas = document.createElement('canvas');
-    const scale = 5;
+    const scale = 2; // Réduit de 5 à 2 pour diminuer la taille
     finalCanvas.width = canvas.width * scale;
     finalCanvas.height = canvas.height * scale;
     const finalCtx = finalCanvas.getContext('2d');
@@ -362,10 +364,20 @@ document.getElementById("download").addEventListener("click", async () => {
     // Mettre à jour le bouton pour indiquer que le téléchargement va commencer
     downloadButton.innerHTML = '<span class="material-icon">file_download</span>Downloading...';
     
-    // Export as PNG with maximum quality
+    // Optimiser la qualité de l'image pour réduire la taille
+    let quality = 0.8; // Qualité initiale
+    let dataUrl = finalCanvas.toDataURL("image/jpeg", quality);
+    
+    // Vérifier la taille et ajuster la qualité si nécessaire
+    while (dataUrl.length > 4 * 1024 * 1024 && quality > 0.5) { // 4 Mo en octets
+      quality -= 0.1;
+      dataUrl = finalCanvas.toDataURL("image/jpeg", quality);
+    }
+    
+    // Export as JPEG with optimized quality
     const link = document.createElement("a");
-    link.download = filename;
-    link.href = finalCanvas.toDataURL("image/png", 1.0);
+    link.download = filename.replace('.png', '.jpg');
+    link.href = dataUrl;
     link.click();
     
     // Réinitialiser le bouton après un court délai
@@ -528,3 +540,9 @@ function applyRadialBlur(ctx, previewCanvas, radialBlur) {
   ctx.putImageData(finalImageData, 0, 0);
   ctx.globalAlpha = 1.0;
 }
+
+// Gestion du panneau de réglages
+settingsToggle.addEventListener('click', () => {
+  settingsToggle.classList.toggle('active');
+  settingsContent.classList.toggle('active');
+});
