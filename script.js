@@ -251,7 +251,7 @@ document.getElementById("download").addEventListener("click", async () => {
   try {
     // Calculer la taille optimale pour Instagram (minimum 1080px sur le côté le plus long)
     const maxDimension = Math.max(canvas.width, canvas.height);
-    const scale = maxDimension < 1080 ? (1080 / maxDimension) * 2 : 2; // Doublé l'échelle
+    const scale = maxDimension < 1080 ? (1080 / maxDimension) * 2 : 2;
     
     const finalCanvas = document.createElement('canvas');
     finalCanvas.width = canvas.width * scale;
@@ -261,10 +261,17 @@ document.getElementById("download").addEventListener("click", async () => {
     finalCtx.imageSmoothingEnabled = true;
     finalCtx.imageSmoothingQuality = 'high';
     
-    // Dessiner l'image avec la nouvelle échelle
-    finalCtx.drawImage(canvas, 0, 0, finalCanvas.width, finalCanvas.height);
+    // Utiliser le même canvas de prévisualisation pour l'export
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx.drawImage(canvas, 0, 0);
     
-    // Appliquer les effets
+    // Redimensionner l'image avec la nouvelle échelle
+    finalCtx.drawImage(tempCanvas, 0, 0, finalCanvas.width, finalCanvas.height);
+    
+    // Appliquer les effets avec les mêmes paramètres que la prévisualisation
     const imageData = finalCtx.getImageData(0, 0, finalCanvas.width, finalCanvas.height);
     const data = imageData.data;
     const contrast = parseFloat(contrastSlider.value);
@@ -292,16 +299,16 @@ document.getElementById("download").addEventListener("click", async () => {
 
     // Appliquer le flou radial de manière optimisée
     if (radialBlur > 0) {
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = finalCanvas.width;
-      tempCanvas.height = finalCanvas.height;
-      const tempCtx = tempCanvas.getContext('2d');
-      tempCtx.drawImage(finalCanvas, 0, 0);
+      const blurCanvas = document.createElement('canvas');
+      blurCanvas.width = finalCanvas.width;
+      blurCanvas.height = finalCanvas.height;
+      const blurCtx = blurCanvas.getContext('2d');
+      blurCtx.drawImage(finalCanvas, 0, 0);
       
       finalCtx.clearRect(0, 0, finalCanvas.width, finalCanvas.height);
-      finalCtx.drawImage(tempCanvas, 0, 0);
+      finalCtx.drawImage(blurCanvas, 0, 0);
       
-      const steps = Math.min(8, Math.ceil(radialBlur)); // Réduit le nombre d'étapes
+      const steps = Math.min(8, Math.ceil(radialBlur));
       const baseDistance = radialBlur * 0.3;
       
       for (let i = 0; i < steps; i++) {
@@ -316,7 +323,7 @@ document.getElementById("download").addEventListener("click", async () => {
         const alpha = (1 - Math.pow(progress, 2)) / steps;
         finalCtx.globalAlpha = alpha;
         
-        finalCtx.drawImage(tempCanvas, offsetX, offsetY);
+        finalCtx.drawImage(blurCanvas, offsetX, offsetY);
       }
     }
 
@@ -362,11 +369,11 @@ document.getElementById("download").addEventListener("click", async () => {
     downloadButton.innerHTML = '<span class="material-icon">file_download</span>Downloading...';
     
     // Optimiser la qualité de l'image
-    let quality = 0.9; // Augmenté de 0.85 à 0.9
+    let quality = 0.95; // Augmenté à 0.95 pour une meilleure qualité
     let dataUrl = finalCanvas.toDataURL("image/jpeg", quality);
     
     // Ajuster la qualité si nécessaire pour rester sous 4 Mo
-    while (dataUrl.length > 4 * 1024 * 1024 && quality > 0.7) { // Augmenté le minimum de 0.6 à 0.7
+    while (dataUrl.length > 4 * 1024 * 1024 && quality > 0.8) { // Augmenté le minimum à 0.8
       quality -= 0.05;
       dataUrl = finalCanvas.toDataURL("image/jpeg", quality);
     }
