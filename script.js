@@ -169,8 +169,8 @@ function loadImage(file) {
       let newWidth = img.width;
       let newHeight = img.height;
       
-      // Réduire la taille maximale sur mobile
-      const MAX_DIMENSION = window.innerWidth <= 900 ? 800 : 1500;
+      // Augmenter la taille maximale sur mobile et desktop
+      const MAX_DIMENSION = window.innerWidth <= 900 ? 1200 : 2000;
       
       if (img.width > MAX_DIMENSION || img.height > MAX_DIMENSION) {
         if (img.width > img.height) {
@@ -189,7 +189,7 @@ function loadImage(file) {
       // Draw and compress image
       tempCtx.drawImage(img, 0, 0, newWidth, newHeight);
       
-      // Create compressed image with lower quality on mobile
+      // Create compressed image with higher quality
       const compressedImg = new Image();
       compressedImg.onload = function() {
         originalImage = compressedImg;
@@ -199,8 +199,8 @@ function loadImage(file) {
         // Apply effects with current settings
         applyPreviewEffects();
       };
-      // Réduire la qualité sur mobile
-      const quality = window.innerWidth <= 900 ? 0.5 : 0.7;
+      // Augmenter la qualité de compression
+      const quality = window.innerWidth <= 900 ? 0.8 : 0.9;
       compressedImg.src = tempCanvas.toDataURL('image/jpeg', quality);
     };
     img.src = e.target.result;
@@ -241,7 +241,7 @@ textureSelect.addEventListener("change", () => {
 document.getElementById("download").addEventListener("click", () => {
   // Create a high-resolution canvas for export
   const finalCanvas = document.createElement('canvas');
-  const scale = 2; // Facteur d'échelle pour la haute résolution
+  const scale = 3; // Augmenter le facteur d'échelle pour une meilleure résolution
   finalCanvas.width = canvas.width * scale;
   finalCanvas.height = canvas.height * scale;
   const finalCtx = finalCanvas.getContext('2d');
@@ -290,7 +290,7 @@ document.getElementById("download").addEventListener("click", () => {
     finalCtx.clearRect(0, 0, finalCanvas.width, finalCanvas.height);
     finalCtx.drawImage(tempCanvas, 0, 0);
     
-    const steps = Math.min(8, Math.ceil(radialBlur));
+    const steps = Math.min(12, Math.ceil(radialBlur * 1.5)); // Augmenter le nombre d'étapes pour un meilleur flou
     const baseDistance = radialBlur * 0.4;
     
     for (let pass = 0; pass < 2; pass++) {
