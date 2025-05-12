@@ -660,29 +660,44 @@ select option {
 @media (max-width: 900px) {
   #main-container {
     flex-direction: column;
-    height: auto;
-    min-height: 100vh;
-    overflow-y: auto;
-    padding-bottom: 0;
+    height: 100vh;
+    overflow: hidden;
   }
 
   #preview-container {
-    height: 90vh;
-    min-height: 500px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    flex: 1;
+    height: 70vh;
+    min-height: 70vh;
+    max-height: 70vh;
   }
 
   #controls-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
     width: 100%;
-    padding: 20px 24px;
+    height: 30vh;
+    min-height: 30vh;
+    max-height: 30vh;
+    padding: 16px;
+    overflow-y: auto;
+    overflow-x: hidden;
     border-left: none;
     border-top: 1px solid #FFBF00;
-    gap: 30px;
-    height: auto;
-    min-height: auto;
-    padding-bottom: 50px;
+    z-index: 1000;
+  }
+
+  /* Ajout d'un effet de dégradé en bas du panneau pour indiquer qu'il y a plus de contenu */
+  #controls-panel::after {
+    content: '';
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 30px;
+    background: linear-gradient(to bottom, transparent, #0F0F0F);
+    pointer-events: none;
   }
 
   .control {
