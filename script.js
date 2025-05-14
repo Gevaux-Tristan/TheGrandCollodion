@@ -52,6 +52,73 @@ function debounce(func, wait, immediate = false) {
   };
 }
 
+// Créer une fonction qui applique les effets de manière cohérente
+function applyEffects(ctx, width, height, settings) {
+  const {
+    contrast,
+    exposure,
+    grain,
+    radialBlur,
+    opacity,
+    texture,
+    imageData
+  } = settings;
+
+  ctx.putImageData(imageData, 0, 0);
+
+  // Appliquer le contraste et l'exposition
+  const processedData = ctx.getImageData(0, 0, width, height);
+  const data = processedData.data;
+  const contrastFactor = contrast;
+  const exposureFactor = Math.pow(2, exposure);
+  const lut = new Uint8ClampedArray(256);
+  
+  for (let i = 0; i < 256; i++) {
+    lut[i] = Math.min(255, Math.max(0, ((i - 128) * contrastFactor + 128) * exposureFactor));
+  }
+
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = lut[data[i]];
+    data[i+1] = lut[data[i+1]];
+    data[i+2] = lut[data[i+2]];
+  }
+
+  ctx.putImageData(processedData, 0, 0);
+
+  // Appliquer le flou radial
+  if (radialBlur > 0) {
+    applyRadialBlur(ctx, width, height, radialBlur);
+  }
+
+  // Appliquer le grain
+  if (grain > 0) {
+    const grainData = ctx.getImageData(0, 0, width, height);
+    const noise = new Uint8ClampedArray(grainData.data.length);
+    
+    for (let i = 0; i < noise.length; i += 4) {
+      const n = (Math.random() - 0.5) * 255 * grain;
+      noise[i] = noise[i + 1] = noise[i + 2] = n;
+    }
+    
+    for (let i = 0; i < grainData.data.length; i += 4) {
+      grainData.data[i] = Math.min(255, Math.max(0, grainData.data[i] + noise[i]));
+      grainData.data[i + 1] = Math.min(255, Math.max(0, grainData.data[i + 1] + noise[i + 1]));
+      grainData.data[i + 2] = Math.min(255, Math.max(0, grainData.data[i + 2] + noise[i + 2]));
+    }
+    ctx.putImageData(grainData, 0, 0);
+  }
+
+  // Appliquer la texture
+  if (texture && texture.complete && opacity > 0) {
+    ctx.globalAlpha = opacity;
+    ctx.globalCompositeOperation = "overlay";
+    ctx.drawImage(texture, 0, 0, width, height);
+    ctx.globalAlpha = 1.0;
+    ctx.globalCompositeOperation = "source-over";
+  }
+}
+
+// Modifier la fonction applyPreviewEffects pour utiliser la nouvelle fonction
 function applyPreviewEffects() {
   if (!originalImage || isProcessing) {
     needsUpdate = true;
@@ -60,90 +127,33 @@ function applyPreviewEffects() {
 
   isProcessing = true;
   requestAnimationFrame(() => {
-    // Use cached image data if available
     if (!cachedImageData) {
       previewCanvas.width = originalImage.width;
       previewCanvas.height = originalImage.height;
       previewCtx.drawImage(originalImage, 0, 0);
       cachedImageData = previewCtx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
       
-      // Convert to black and white
       const data = cachedImageData.data;
       for (let i = 0; i < data.length; i += 4) {
         const avg = (data[i] + data[i+1] + data[i+2]) / 3;
         data[i] = data[i+1] = data[i+2] = avg;
       }
-      previewCtx.putImageData(cachedImageData, 0, 0);
-      cachedImageData = previewCtx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
     }
 
     canvas.width = originalImage.width;
     canvas.height = originalImage.height;
-    ctx.putImageData(cachedImageData, 0, 0);
 
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
-    const contrast = parseFloat(contrastSlider.value);
-    const exposure = parseFloat(exposureSlider.value);
+    const settings = {
+      contrast: parseFloat(contrastSlider.value),
+      exposure: parseFloat(exposureSlider.value),
+      grain: parseFloat(grainSlider.value),
+      radialBlur: parseFloat(radialBlurSlider.value),
+      opacity: parseFloat(opacitySlider.value),
+      texture: textureImage,
+      imageData: cachedImageData
+    };
 
-    // Fast contrast and exposure calculation
-    const contrastFactor = contrast;
-    const exposureFactor = Math.pow(2, exposure);
-    const lut = new Uint8ClampedArray(256);
-    
-    // Pre-calculate lookup table for contrast and exposure
-    for (let i = 0; i < 256; i++) {
-      lut[i] = Math.min(255, Math.max(0, ((i - 128) * contrastFactor + 128) * exposureFactor));
-    }
-
-    // Apply lookup table
-    for (let i = 0; i < data.length; i += 4) {
-      data[i] = lut[data[i]];
-      data[i+1] = lut[data[i+1]];
-      data[i+2] = lut[data[i+2]];
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-
-    const radialBlur = parseFloat(radialBlurSlider.value);
-    if (radialBlur > 0) {
-      applyRadialBlur(ctx, previewCanvas, radialBlur);
-    }
-
-    const grainAmount = parseFloat(grainSlider.value);
-    if (grainAmount > 0) {
-      const grainData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const noise = new Uint8ClampedArray(grainData.data.length);
-      
-      // Optimiser le grain sur mobile
-      const isMobile = window.innerWidth <= 900;
-      const grainStep = isMobile ? 8 : 4; // Traiter moins de pixels sur mobile
-      
-      for (let i = 0; i < noise.length; i += grainStep) {
-        const n = (Math.random() - 0.5) * 255 * grainAmount;
-        for (let j = 0; j < grainStep && i + j < noise.length; j += 4) {
-          noise[i + j] = noise[i + j + 1] = noise[i + j + 2] = n;
-        }
-      }
-      
-      for (let i = 0; i < grainData.data.length; i += grainStep) {
-        for (let j = 0; j < grainStep && i + j < grainData.data.length; j += 4) {
-          grainData.data[i + j] = Math.min(255, Math.max(0, grainData.data[i + j] + noise[i + j]));
-          grainData.data[i + j + 1] = Math.min(255, Math.max(0, grainData.data[i + j + 1] + noise[i + j + 1]));
-          grainData.data[i + j + 2] = Math.min(255, Math.max(0, grainData.data[i + j + 2] + noise[i + j + 2]));
-        }
-      }
-      ctx.putImageData(grainData, 0, 0);
-    }
-
-    const opacity = parseFloat(opacitySlider.value);
-    if (textureImage.src && textureImage.complete && opacity > 0) {
-      ctx.globalAlpha = opacity;
-      ctx.globalCompositeOperation = "overlay";
-      ctx.drawImage(textureImage, 0, 0, canvas.width, canvas.height);
-      ctx.globalAlpha = 1.0;
-      ctx.globalCompositeOperation = "source-over";
-    }
+    applyEffects(ctx, canvas.width, canvas.height, settings);
 
     isProcessing = false;
     if (needsUpdate) {
@@ -158,11 +168,42 @@ const debounceDelay = window.innerWidth <= 900 ? 32 : 16;
 const debouncedApplyEffects = debounce(applyPreviewEffects, debounceDelay, true);
 const debouncedRadialBlur = debounce(applyPreviewEffects, debounceDelay * 2, true);
 
+// Gestionnaires d'événements pour le drag & drop
+const previewContainer = document.getElementById('preview-container');
+
+function preventDefaults(e) {
+  e.preventDefault();
+  e.stopPropagation();
+}
+
+function highlight(e) {
+  previewContainer.classList.add('drag-over');
+}
+
+function unhighlight(e) {
+  previewContainer.classList.remove('drag-over');
+}
+
+// Ajouter les événements drag & drop
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+  previewContainer.addEventListener(eventName, preventDefaults, false);
+  document.body.addEventListener(eventName, preventDefaults, false);
+});
+
+['dragenter', 'dragover'].forEach(eventName => {
+  previewContainer.addEventListener(eventName, highlight, false);
+});
+
+['dragleave', 'drop'].forEach(eventName => {
+  previewContainer.addEventListener(eventName, unhighlight, false);
+});
+
+// Fonction de chargement d'image
 function loadImage(file) {
   const reader = new FileReader();
-  reader.onload = function (e) {
+  reader.onload = function(e) {
     const img = new Image();
-    img.onload = function () {
+    img.onload = function() {
       // Create a temporary canvas for compression
       const tempCanvas = document.createElement('canvas');
       const tempCtx = tempCanvas.getContext('2d');
@@ -195,7 +236,7 @@ function loadImage(file) {
       const compressedImg = new Image();
       compressedImg.onload = function() {
         originalImage = compressedImg;
-        document.getElementById('preview-container').classList.add('has-image');
+        previewContainer.classList.add('has-image');
         // Reset the cached image data to force a new processing with current settings
         cachedImageData = null;
         // Apply effects with current settings
@@ -210,36 +251,34 @@ function loadImage(file) {
   reader.readAsDataURL(file);
 }
 
-imageInput.addEventListener("change", () => {
-  if (imageInput.files.length > 0) {
-    loadImage(imageInput.files[0]);
+// Gestionnaire d'événement pour l'upload via le bouton
+imageInput.addEventListener('change', (e) => {
+  if (e.target.files && e.target.files.length > 0) {
+    loadImage(e.target.files[0]);
   }
 });
 
-document.body.addEventListener("dragover", (e) => {
-  e.preventDefault();
-});
+// Gestionnaire d'événement pour le drop
+previewContainer.addEventListener('drop', (e) => {
+  const dt = e.dataTransfer;
+  const files = dt.files;
 
-document.body.addEventListener("drop", (e) => {
-  e.preventDefault();
-  if (e.dataTransfer.files.length > 0) {
-    loadImage(e.dataTransfer.files[0]);
+  if (files.length > 0) {
+    loadImage(files[0]);
   }
 });
 
 // Update event listeners
-[contrastSlider, opacitySlider, grainSlider, exposureSlider].forEach(slider => {
+[contrastSlider, opacitySlider, grainSlider, exposureSlider, radialBlurSlider].forEach(slider => {
   slider.addEventListener("input", debouncedApplyEffects);
 });
-
-// Separate event listener for radial blur with different debounce
-radialBlurSlider.addEventListener("input", debouncedRadialBlur);
 
 textureSelect.addEventListener("change", () => {
   textureImage.src = textureSelect.value;
   textureImage.onload = () => applyPreviewEffects();
 });
 
+// Modifier la fonction de téléchargement pour utiliser exactement le même processus
 document.getElementById("download").addEventListener("click", async () => {
   const downloadButton = document.getElementById("download");
   const originalText = downloadButton.innerHTML;
@@ -247,193 +286,36 @@ document.getElementById("download").addEventListener("click", async () => {
   downloadButton.disabled = true;
   downloadButton.innerHTML = '<span class="material-icon">hourglass_empty</span>Processing...';
   downloadButton.style.opacity = '0.7';
-  
+
   try {
-    // Calculer la taille optimale pour Instagram (minimum 1080px sur le côté le plus long)
-    const maxDimension = Math.max(canvas.width, canvas.height);
-    const scale = maxDimension < 1080 ? (1080 / maxDimension) * 2 : 2;
+    // Créer un nouveau canvas pour l'export avec les mêmes dimensions
+    const exportCanvas = document.createElement('canvas');
+    const exportCtx = exportCanvas.getContext('2d');
     
-    const finalCanvas = document.createElement('canvas');
-    finalCanvas.width = canvas.width * scale;
-    finalCanvas.height = canvas.height * scale;
-    const finalCtx = finalCanvas.getContext('2d');
-    
-    finalCtx.imageSmoothingEnabled = true;
-    finalCtx.imageSmoothingQuality = 'high';
-    
-    // Utiliser le même canvas de prévisualisation pour l'export
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = canvas.width;
-    tempCanvas.height = canvas.height;
-    const tempCtx = tempCanvas.getContext('2d');
-    tempCtx.drawImage(canvas, 0, 0);
-    
-    // Redimensionner l'image avec la nouvelle échelle
-    finalCtx.drawImage(tempCanvas, 0, 0, finalCanvas.width, finalCanvas.height);
-    
-    // Appliquer les effets avec les mêmes paramètres que la prévisualisation
-    const imageData = finalCtx.getImageData(0, 0, finalCanvas.width, finalCanvas.height);
-    const data = imageData.data;
-    const contrast = parseFloat(contrastSlider.value);
-    const exposure = parseFloat(exposureSlider.value);
-    const radialBlur = parseFloat(radialBlurSlider.value);
-    const grainAmount = parseFloat(grainSlider.value);
-    const opacity = parseFloat(opacitySlider.value);
+    // Utiliser exactement les mêmes dimensions que le canvas de prévisualisation
+    exportCanvas.width = canvas.width;
+    exportCanvas.height = canvas.height;
 
-    // Appliquer contraste et exposition
-    const contrastFactor = contrast;
-    const exposureFactor = Math.pow(2, exposure);
-    const lut = new Uint8ClampedArray(256);
-    
-    for (let i = 0; i < 256; i++) {
-      lut[i] = Math.min(255, Math.max(0, ((i - 128) * contrastFactor + 128) * exposureFactor));
-    }
+    // Copier l'état exact du canvas de prévisualisation
+    exportCtx.drawImage(canvas, 0, 0);
 
-    for (let i = 0; i < data.length; i += 4) {
-      data[i] = lut[data[i]];
-      data[i+1] = lut[data[i+1]];
-      data[i+2] = lut[data[i+2]];
-    }
-    
-    finalCtx.putImageData(imageData, 0, 0);
-
-    // Appliquer le flou radial de manière optimisée
-    if (radialBlur > 0) {
-      const blurCanvas = document.createElement('canvas');
-      blurCanvas.width = finalCanvas.width;
-      blurCanvas.height = finalCanvas.height;
-      const blurCtx = blurCanvas.getContext('2d');
-      blurCtx.drawImage(finalCanvas, 0, 0);
-      
-      finalCtx.clearRect(0, 0, finalCanvas.width, finalCanvas.height);
-      finalCtx.drawImage(blurCanvas, 0, 0);
-      
-      const steps = Math.min(8, Math.ceil(radialBlur));
-      const baseDistance = radialBlur * 0.3;
-      
-      for (let i = 0; i < steps; i++) {
-        const angle = (i / steps) * Math.PI * 2;
-        const progress = i / steps;
-        const smoothProgress = 0.5 - Math.cos(progress * Math.PI) * 0.5;
-        const distance = baseDistance * smoothProgress;
-        
-        const offsetX = Math.cos(angle) * distance;
-        const offsetY = Math.sin(angle) * distance;
-        
-        const alpha = (1 - Math.pow(progress, 2)) / steps;
-        finalCtx.globalAlpha = alpha;
-        
-        finalCtx.drawImage(blurCanvas, offsetX, offsetY);
-      }
-    }
-
-    // Appliquer le grain de manière optimisée
-    if (grainAmount > 0) {
-      const grainData = finalCtx.getImageData(0, 0, finalCanvas.width, finalCanvas.height);
-      const data = grainData.data;
-      const noise = new Uint8ClampedArray(data.length);
-      
-      // Optimiser le grain en traitant moins de pixels
-      const step = 4;
-      for (let i = 0; i < noise.length; i += step) {
-        const n = (Math.random() - 0.5) * 255 * grainAmount;
-        for (let j = 0; j < step && i + j < noise.length; j += 4) {
-          noise[i + j] = noise[i + j + 1] = noise[i + j + 2] = n;
-        }
-      }
-      
-      for (let i = 0; i < data.length; i += step) {
-        for (let j = 0; j < step && i + j < data.length; j += 4) {
-          data[i + j] = Math.min(255, Math.max(0, data[i + j] + noise[i + j]));
-          data[i + j + 1] = Math.min(255, Math.max(0, data[i + j + 1] + noise[i + j + 1]));
-          data[i + j + 2] = Math.min(255, Math.max(0, data[i + j + 2] + noise[i + j + 2]));
-        }
-      }
-      finalCtx.putImageData(grainData, 0, 0);
-    }
-
-    // Appliquer la texture
-    if (textureImage.src && textureImage.complete && opacity > 0) {
-      finalCtx.globalAlpha = opacity;
-      finalCtx.globalCompositeOperation = "overlay";
-      finalCtx.drawImage(textureImage, 0, 0, finalCanvas.width, finalCanvas.height);
-      finalCtx.globalAlpha = 1.0;
-      finalCtx.globalCompositeOperation = "source-over";
-    }
-
-    let imageNumber = parseInt(localStorage.getItem('lastImageNumber') || '0') + 1;
-    localStorage.setItem('lastImageNumber', imageNumber.toString());
-    
-    const filename = `TheGrandCollodion${imageNumber}.jpg`;
-    
-    downloadButton.innerHTML = '<span class="material-icon">file_download</span>Downloading...';
-    
-    // Optimiser la qualité de l'image
-    let quality = 0.95; // Augmenté à 0.95 pour une meilleure qualité
-    let dataUrl = finalCanvas.toDataURL("image/jpeg", quality);
-    
-    // Ajuster la qualité si nécessaire pour rester sous 4 Mo
-    while (dataUrl.length > 4 * 1024 * 1024 && quality > 0.8) { // Augmenté le minimum à 0.8
-      quality -= 0.05;
-      dataUrl = finalCanvas.toDataURL("image/jpeg", quality);
-    }
-    
-    const link = document.createElement("a");
-    link.download = filename;
+    // Export en haute qualité
+    const dataUrl = exportCanvas.toDataURL('image/jpeg', 1.0);
+    const link = document.createElement('a');
+    link.download = 'collodion-export.jpg';
     link.href = dataUrl;
     link.click();
-    
-    setTimeout(() => {
-      downloadButton.disabled = false;
-      downloadButton.innerHTML = originalText;
-      downloadButton.style.opacity = '1';
-    }, 1000);
-    
+
+    // Nettoyer
+    exportCanvas.remove();
   } catch (error) {
-    console.error('Error during image processing:', error);
+    console.error('Export failed:', error);
+  } finally {
     downloadButton.disabled = false;
     downloadButton.innerHTML = originalText;
     downloadButton.style.opacity = '1';
   }
 });
-
-// Drag and drop handlers
-const previewContainer = document.getElementById('preview-container');
-
-['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-  previewContainer.addEventListener(eventName, preventDefaults, false);
-});
-
-function preventDefaults(e) {
-  e.preventDefault();
-  e.stopPropagation();
-}
-
-['dragenter', 'dragover'].forEach(eventName => {
-  previewContainer.addEventListener(eventName, highlight, false);
-});
-
-['dragleave', 'drop'].forEach(eventName => {
-  previewContainer.addEventListener(eventName, unhighlight, false);
-});
-
-function highlight(e) {
-  previewContainer.classList.add('drag-over');
-}
-
-function unhighlight(e) {
-  previewContainer.classList.remove('drag-over');
-}
-
-previewContainer.addEventListener('drop', handleDrop, false);
-
-function handleDrop(e) {
-  const dt = e.dataTransfer;
-  const files = dt.files;
-  if (files.length > 0) {
-    loadImage(files[0]);
-  }
-}
 
 // Gestion du menu déroulant personnalisé
 // Version robuste : ouverture/fermeture uniquement sur .selected, fermeture garantie à la sélection
@@ -484,62 +366,44 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 
-// Optimisation du flou radial pour mobile
-function applyRadialBlur(ctx, previewCanvas, radialBlur) {
-  if (radialBlur <= 0) return;
+// Remplacer la fonction applyRadialBlur par cette version améliorée
+function applyRadialBlur(ctx, width, height, intensity) {
+  const tempCanvas = document.createElement('canvas');
+  const tempCtx = tempCanvas.getContext('2d');
+  tempCanvas.width = width;
+  tempCanvas.height = height;
   
-  // Réduire le nombre d'étapes sur mobile
-  const isMobile = window.innerWidth <= 900;
-  const steps = isMobile ? Math.min(4, Math.ceil(radialBlur)) : Math.min(8, Math.ceil(radialBlur));
-  const baseDistance = radialBlur * (isMobile ? 0.3 : 0.4);
+  // Copier l'image originale
+  tempCtx.drawImage(ctx.canvas, 0, 0);
   
-  // Create a temporary canvas for the blur
-  previewCtx.drawImage(canvas, 0, 0);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // Sauvegarder l'état du contexte
+  ctx.save();
   
-  // Draw original image first
-  ctx.globalAlpha = 1;
-  ctx.drawImage(previewCanvas, 0, 0);
+  // Calculer le centre
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const radius = Math.max(width, height) / 2;
   
-  // Apply blur in one pass on mobile, two passes on desktop
-  const passes = isMobile ? 1 : 2;
+  // Créer un dégradé radial pour le masque de flou
+  const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+  gradient.addColorStop(0, `rgba(0, 0, 0, ${intensity / 10})`);
+  gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
   
-  for (let pass = 0; pass < passes; pass++) {
-    for (let i = 0; i < steps; i++) {
-      const angle = (i / steps) * Math.PI * 2;
-      const progress = i / steps;
-      const smoothProgress = 0.5 - Math.cos(progress * Math.PI) * 0.5;
-      const distance = baseDistance * smoothProgress;
-      
-      const offsetX = Math.cos(angle) * distance;
-      const offsetY = Math.sin(angle) * distance;
-      
-      const alpha = (1 - Math.pow(progress, 3)) / (steps * passes);
-      ctx.globalAlpha = alpha * 1.2;
-      
-      ctx.drawImage(previewCanvas, offsetX, offsetY);
-    }
-  }
+  // Appliquer le flou
+  ctx.filter = `blur(${intensity * 2}px)`;
+  ctx.drawImage(tempCanvas, 0, 0);
+  ctx.filter = 'none';
   
-  // Very subtle center reinforcement
-  if (radialBlur > 2) {
-    ctx.globalAlpha = isMobile ? 0.08 : 0.12;
-    ctx.drawImage(previewCanvas, 0, 0);
-  }
+  // Restaurer l'image originale au centre
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, width, height);
   
-  // Minimal brightness compensation
-  const finalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = finalImageData.data;
-  const brightnessFactor = 1 + (radialBlur * 0.003);
+  // Restaurer l'état du contexte
+  ctx.restore();
   
-  for (let i = 0; i < data.length; i += 4) {
-    data[i] = Math.min(255, data[i] * brightnessFactor);
-    data[i+1] = Math.min(255, data[i+1] * brightnessFactor);
-    data[i+2] = Math.min(255, data[i+2] * brightnessFactor);
-  }
-  
-  ctx.putImageData(finalImageData, 0, 0);
-  ctx.globalAlpha = 1.0;
+  // Nettoyer
+  tempCanvas.remove();
 }
 
 // Gestion du panneau de réglages
@@ -547,3 +411,9 @@ settingsToggle.addEventListener('click', () => {
   settingsToggle.classList.toggle('active');
   settingsContent.classList.toggle('active');
 });
+
+// Mettre à jour les valeurs du slider de flou radial
+radialBlurSlider.min = "0";
+radialBlurSlider.max = "5";
+radialBlurSlider.step = "0.1";
+radialBlurSlider.value = "0";
