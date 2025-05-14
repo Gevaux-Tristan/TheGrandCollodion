@@ -164,9 +164,9 @@ input[type="range"]::-ms-track {
 
 /* Style du select */
 #controls-panel select {
-  -webkit-appearance: none !important;
-  -moz-appearance: none !important;
-  appearance: none !important;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
   width: 100% !important;
   padding: 12px 40px 12px 12px !important;
   font-size: 15px !important;
