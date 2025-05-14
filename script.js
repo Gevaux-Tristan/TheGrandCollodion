@@ -60,7 +60,7 @@ const RENDER_INTERVAL = isMobile ? 1000 / 15 : 1000 / 30; // 15 FPS sur mobile p
 const MOBILE_SCALE = 0.25; // Réduction plus aggressive sur mobile pendant le sliding
 const DESKTOP_SCALE = 0.5;
 
-// Modifier la fonction applyEffects pour une meilleure performance mobile
+// Modifier la fonction applyEffects pour s'assurer que l'image est toujours affichée
 function applyEffects(ctx, width, height, settings, isLowRes = false) {
   const {
     contrast,
@@ -72,54 +72,37 @@ function applyEffects(ctx, width, height, settings, isLowRes = false) {
     imageData
   } = settings;
 
-  // Réduction plus aggressive de la résolution sur mobile pendant le sliding
+  // Réduction de la résolution sur mobile pendant le sliding
   const scale = isLowRes ? (isMobile ? MOBILE_SCALE : DESKTOP_SCALE) : 1;
   const targetWidth = Math.floor(width * scale);
   const targetHeight = Math.floor(height * scale);
 
-  if (ctx.canvas.width !== targetWidth) {
-    ctx.canvas.width = targetWidth;
-    ctx.canvas.height = targetHeight;
-  }
+  // S'assurer que le canvas a les bonnes dimensions
+  ctx.canvas.width = width;  // Toujours utiliser la pleine largeur du canvas
+  ctx.canvas.height = height;  // Toujours utiliser la pleine hauteur du canvas
 
-  // Optimisation des calculs pour mobile
+  // Commencer par dessiner l'image originale
   if (isLowRes && isMobile) {
-    // Version ultra-rapide pour le sliding sur mobile
-    ctx.drawImage(originalImage, 0, 0, targetWidth, targetHeight);
+    // Version rapide pour mobile pendant le sliding
+    ctx.drawImage(originalImage, 0, 0, width, height);
     
-    // Appliquer uniquement les effets essentiels pendant le sliding
-    if (contrast !== 1 || exposure !== 0) {
-      const processedData = ctx.getImageData(0, 0, targetWidth, targetHeight);
-      const data = processedData.data;
-      const contrastFactor = contrast;
-      const exposureFactor = Math.pow(2, exposure);
-      
-      // Optimiser en traitant moins de pixels
-      for (let i = 0; i < data.length; i += 8) {
-        const val = Math.min(255, Math.max(0, ((data[i] - 128) * contrastFactor + 128) * exposureFactor));
-        for (let j = 0; j < 8 && (i + j) < data.length; j += 4) {
-          data[i + j] = data[i + j + 1] = data[i + j + 2] = val;
-        }
+    // Appliquer les effets de base
+    const processedData = ctx.getImageData(0, 0, width, height);
+    const data = processedData.data;
+    const contrastFactor = contrast;
+    const exposureFactor = Math.pow(2, exposure);
+    
+    // Traitement optimisé des pixels
+    for (let i = 0; i < data.length; i += 8) {
+      const val = Math.min(255, Math.max(0, ((data[i] - 128) * contrastFactor + 128) * exposureFactor));
+      for (let j = 0; j < 8 && (i + j) < data.length; j += 4) {
+        data[i + j] = data[i + j + 1] = data[i + j + 2] = val;
       }
-      
-      ctx.putImageData(processedData, 0, 0);
     }
-
-    // Appliquer la texture en basse résolution
-    if (texture && texture.complete && opacity > 0) {
-      ctx.globalAlpha = opacity;
-      ctx.globalCompositeOperation = "overlay";
-      ctx.drawImage(texture, 0, 0, targetWidth, targetHeight);
-      ctx.globalAlpha = 1.0;
-      ctx.globalCompositeOperation = "source-over";
-    }
+    
+    ctx.putImageData(processedData, 0, 0);
   } else {
-    // Version normale pour desktop ou rendu final
-    // S'assurer que le contexte est configuré correctement
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-
-    // Appliquer l'image de base
+    // Version normale avec tous les effets
     ctx.putImageData(imageData, 0, 0);
 
     // Appliquer le contraste et l'exposition
@@ -127,58 +110,51 @@ function applyEffects(ctx, width, height, settings, isLowRes = false) {
     const data = processedData.data;
     const contrastFactor = contrast;
     const exposureFactor = Math.pow(2, exposure);
-    const lut = new Uint8ClampedArray(256);
     
-    for (let i = 0; i < 256; i++) {
-      lut[i] = Math.min(255, Math.max(0, ((i - 128) * contrastFactor + 128) * exposureFactor));
-    }
-
     for (let i = 0; i < data.length; i += 4) {
-      data[i] = lut[data[i]];
-      data[i+1] = lut[data[i+1]];
-      data[i+2] = lut[data[i+2]];
+      const val = Math.min(255, Math.max(0, ((data[i] - 128) * contrastFactor + 128) * exposureFactor));
+      data[i] = data[i + 1] = data[i + 2] = val;
     }
-
+    
     ctx.putImageData(processedData, 0, 0);
 
-    // Appliquer le flou radial
-    if (radialBlur > 0) {
-      applyRadialBlur(ctx, width, height, radialBlur);
-    }
-
-    // Appliquer le grain
-    if (grain > 0) {
-      const grainData = ctx.getImageData(0, 0, width, height);
-      const noise = new Uint8ClampedArray(grainData.data.length);
-      
-      for (let i = 0; i < noise.length; i += 4) {
-        const n = (Math.random() - 0.5) * 255 * grain;
-        noise[i] = noise[i + 1] = noise[i + 2] = n;
+    // Appliquer les autres effets si ce n'est pas en basse résolution
+    if (!isLowRes) {
+      if (radialBlur > 0) {
+        applyRadialBlur(ctx, width, height, radialBlur);
       }
-      
-      for (let i = 0; i < grainData.data.length; i += 4) {
-        grainData.data[i] = Math.min(255, Math.max(0, grainData.data[i] + noise[i]));
-        grainData.data[i + 1] = Math.min(255, Math.max(0, grainData.data[i + 1] + noise[i + 1]));
-        grainData.data[i + 2] = Math.min(255, Math.max(0, grainData.data[i + 2] + noise[i + 2]));
-      }
-      ctx.putImageData(grainData, 0, 0);
-    }
 
-    // Appliquer la texture
-    if (texture && texture.complete && opacity > 0) {
-      ctx.globalAlpha = opacity;
-      ctx.globalCompositeOperation = "overlay";
-      // Utiliser drawImage avec les dimensions explicites
-      ctx.drawImage(texture, 0, 0, width, height);
-      ctx.globalAlpha = 1.0;
-      ctx.globalCompositeOperation = "source-over";
+      if (grain > 0) {
+        const grainData = ctx.getImageData(0, 0, width, height);
+        const noiseData = grainData.data;
+        for (let i = 0; i < noiseData.length; i += 4) {
+          const noise = (Math.random() - 0.5) * grain * 255;
+          noiseData[i] = Math.min(255, Math.max(0, noiseData[i] + noise));
+          noiseData[i + 1] = Math.min(255, Math.max(0, noiseData[i + 1] + noise));
+          noiseData[i + 2] = Math.min(255, Math.max(0, noiseData[i + 2] + noise));
+        }
+        ctx.putImageData(grainData, 0, 0);
+      }
     }
+  }
+
+  // Toujours appliquer la texture
+  if (texture && texture.complete && opacity > 0) {
+    ctx.globalAlpha = opacity;
+    ctx.globalCompositeOperation = "overlay";
+    ctx.drawImage(texture, 0, 0, width, height);
+    ctx.globalAlpha = 1.0;
+    ctx.globalCompositeOperation = "source-over";
   }
 }
 
-// Modifier la fonction applyPreviewEffects pour utiliser la nouvelle fonction
+// Modifier la fonction applyPreviewEffects pour s'assurer que l'image est toujours affichée
 function applyPreviewEffects(forceFullQuality = false) {
-  if (!originalImage || (isProcessing && !forceFullQuality)) {
+  if (!originalImage) {
+    return;
+  }
+
+  if (isProcessing && !forceFullQuality) {
     needsUpdate = true;
     return;
   }
@@ -190,58 +166,41 @@ function applyPreviewEffects(forceFullQuality = false) {
   lastRenderTime = now;
 
   isProcessing = true;
-  
-  // Utiliser requestAnimationFrame de manière plus efficace sur mobile
-  if (isMobile && isSliding && !forceFullQuality) {
-    // Rendu immédiat en basse résolution sur mobile
-    const settings = {
-      contrast: parseFloat(contrastSlider.value),
-      exposure: parseFloat(exposureSlider.value),
-      grain: 0, // Skip grain during sliding
-      radialBlur: 0, // Skip radial blur during sliding
-      opacity: parseFloat(opacitySlider.value),
-      texture: textureImage,
-      imageData: cachedImageData
-    };
 
-    applyEffects(ctx, canvas.width, canvas.height, settings, true);
-    isProcessing = false;
+  // S'assurer que le canvas a les bonnes dimensions
+  if (!cachedImageData) {
+    previewCanvas.width = originalImage.width;
+    previewCanvas.height = originalImage.height;
+    previewCtx.drawImage(originalImage, 0, 0);
+    cachedImageData = previewCtx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
     
-    if (needsUpdate) {
-      needsUpdate = false;
-      requestAnimationFrame(() => applyPreviewEffects(forceFullQuality));
+    // Convertir en noir et blanc
+    const data = cachedImageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const avg = (data[i] + data[i+1] + data[i+2]) / 3;
+      data[i] = data[i+1] = data[i+2] = avg;
     }
-  } else {
-    // Version normale pour desktop ou rendu final
-    requestAnimationFrame(() => {
-      if (!cachedImageData) {
-        previewCanvas.width = originalImage.width;
-        previewCanvas.height = originalImage.height;
-        previewCtx.drawImage(originalImage, 0, 0);
-        cachedImageData = previewCtx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
-        
-        const data = cachedImageData.data;
-        for (let i = 0; i < data.length; i += 4) {
-          const avg = (data[i] + data[i+1] + data[i+2]) / 3;
-          data[i] = data[i+1] = data[i+2] = avg;
-        }
-      }
+  }
 
-      canvas.width = originalImage.width;
-      canvas.height = originalImage.height;
+  canvas.width = originalImage.width;
+  canvas.height = originalImage.height;
 
-      const settings = {
-        contrast: parseFloat(contrastSlider.value),
-        exposure: parseFloat(exposureSlider.value),
-        grain: parseFloat(grainSlider.value),
-        radialBlur: parseFloat(radialBlurSlider.value),
-        opacity: parseFloat(opacitySlider.value),
-        texture: textureImage,
-        imageData: cachedImageData
-      };
+  const settings = {
+    contrast: parseFloat(contrastSlider.value),
+    exposure: parseFloat(exposureSlider.value),
+    grain: parseFloat(grainSlider.value),
+    radialBlur: parseFloat(radialBlurSlider.value),
+    opacity: parseFloat(opacitySlider.value),
+    texture: textureImage,
+    imageData: cachedImageData
+  };
 
-      applyEffects(ctx, canvas.width, canvas.height, settings);
-    });
+  applyEffects(ctx, canvas.width, canvas.height, settings, isSliding && !forceFullQuality);
+
+  isProcessing = false;
+  if (needsUpdate) {
+    needsUpdate = false;
+    requestAnimationFrame(() => applyPreviewEffects(forceFullQuality));
   }
 }
 
