@@ -8,10 +8,11 @@ let previewCtx = previewCanvas.getContext('2d');
 let cachedImageData = null;
 let isSliding = false;
 let lastRenderTime = 0;
-const RENDER_INTERVAL = window.innerWidth <= 900 ? 1000 / 15 : 1000 / 30;
-const MOBILE_SCALE = 0.25;
-const DESKTOP_SCALE = 0.5;
+const RENDER_INTERVAL = isMobile ? 1000 / 30 : 1000 / 60;
+const MOBILE_SCALE = 0.15;
+const DESKTOP_SCALE = 0.3;
 const isMobile = window.innerWidth <= 900;
+const DEBOUNCE_DELAY = isMobile ? 16 : 8;
 
 const contrastSlider = document.getElementById("contrast");
 const opacitySlider = document.getElementById("opacity");
@@ -160,11 +161,22 @@ function unhighlight(element) {
 }
 
 function createSliderHandler(slider) {
+    let rafId = null;
+    
     return function() {
         isSliding = true;
-        if (performance.now() - lastRenderTime >= RENDER_INTERVAL) {
-            applyPreviewEffects(false);
+        
+        if (rafId) {
+            cancelAnimationFrame(rafId);
         }
+        
+        rafId = requestAnimationFrame(() => {
+            const now = performance.now();
+            if (now - lastRenderTime >= RENDER_INTERVAL) {
+                lastRenderTime = now;
+                applyPreviewEffects(false);
+            }
+        });
     };
 }
 
@@ -253,58 +265,64 @@ function applyEffects(ctx, width, height, settings, isLowRes = false) {
     const targetWidth = Math.floor(width * scale);
     const targetHeight = Math.floor(height * scale);
 
-    ctx.canvas.width = width;
-    ctx.canvas.height = height;
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d', { alpha: false });
+    tempCanvas.width = targetWidth;
+    tempCanvas.height = targetHeight;
 
-    if (isLowRes && isMobile) {
-        ctx.drawImage(originalImage, 0, 0, width, height);
+    if (isLowRes) {
+        tempCtx.drawImage(originalImage, 0, 0, targetWidth, targetHeight);
         
-        const processedData = ctx.getImageData(0, 0, width, height);
-        const data = processedData.data;
+        const imageData = tempCtx.getImageData(0, 0, targetWidth, targetHeight);
+        const data = imageData.data;
+        
         const contrastFactor = contrast;
         const exposureFactor = Math.pow(2, exposure);
         
-        for (let i = 0; i < data.length; i += 8) {
-            const val = Math.min(255, Math.max(0, ((data[i] - 128) * contrastFactor + 128) * exposureFactor));
-            for (let j = 0; j < 8 && (i + j) < data.length; j += 4) {
+        const lut = new Uint8ClampedArray(256);
+        for (let i = 0; i < 256; i++) {
+            lut[i] = Math.min(255, Math.max(0, ((i - 128) * contrastFactor + 128) * exposureFactor));
+        }
+        
+        for (let i = 0; i < data.length; i += 16) {
+            const val = lut[data[i]];
+            for (let j = 0; j < 16 && (i + j) < data.length; j += 4) {
                 data[i + j] = data[i + j + 1] = data[i + j + 2] = val;
             }
         }
         
-        ctx.putImageData(processedData, 0, 0);
+        tempCtx.putImageData(imageData, 0, 0);
     } else {
-        ctx.putImageData(imageData, 0, 0);
-
-        const processedData = ctx.getImageData(0, 0, width, height);
-        const data = processedData.data;
-        const contrastFactor = contrast;
-        const exposureFactor = Math.pow(2, exposure);
+        tempCtx.putImageData(imageData, 0, 0);
         
-        for (let i = 0; i < data.length; i += 4) {
-            const val = Math.min(255, Math.max(0, ((data[i] - 128) * contrastFactor + 128) * exposureFactor));
-            data[i] = data[i + 1] = data[i + 2] = val;
+        const processedData = tempCtx.getImageData(0, 0, targetWidth, targetHeight);
+        const data = processedData.data;
+        
+        if (window.Worker && !isLowRes) {
+            // ... traitement dans un Web Worker ...
+        } else {
+            const lut = new Uint8ClampedArray(256);
+            for (let i = 0; i < 256; i++) {
+                lut[i] = Math.min(255, Math.max(0, ((i - 128) * contrast + 128) * Math.pow(2, exposure)));
+            }
+            
+            for (let i = 0; i < data.length; i += 4) {
+                const val = lut[data[i]];
+                data[i] = data[i + 1] = data[i + 2] = val;
+            }
         }
         
-        ctx.putImageData(processedData, 0, 0);
-
+        tempCtx.putImageData(processedData, 0, 0);
+        
         if (!isLowRes) {
-            if (radialBlur > 0) {
-                applyRadialBlur(ctx, width, height, radialBlur);
-            }
-
-            if (grain > 0) {
-                const grainData = ctx.getImageData(0, 0, width, height);
-                const noiseData = grainData.data;
-                for (let i = 0; i < noiseData.length; i += 4) {
-                    const noise = (Math.random() - 0.5) * grain * 255;
-                    noiseData[i] = Math.min(255, Math.max(0, noiseData[i] + noise));
-                    noiseData[i + 1] = Math.min(255, Math.max(0, noiseData[i + 1] + noise));
-                    noiseData[i + 2] = Math.min(255, Math.max(0, noiseData[i + 2] + noise));
-                }
-                ctx.putImageData(grainData, 0, 0);
-            }
+            if (radialBlur > 0) applyRadialBlur(tempCtx, targetWidth, targetHeight, radialBlur);
+            if (grain > 0) applyGrain(tempCtx, targetWidth, targetHeight, grain);
         }
     }
+
+    ctx.canvas.width = width;
+    ctx.canvas.height = height;
+    ctx.drawImage(tempCanvas, 0, 0, width, height);
 
     if (texture && texture.complete && opacity > 0) {
         ctx.globalAlpha = opacity;
@@ -313,13 +331,13 @@ function applyEffects(ctx, width, height, settings, isLowRes = false) {
         ctx.globalAlpha = 1.0;
         ctx.globalCompositeOperation = "source-over";
     }
+
+    tempCanvas.remove();
 }
 
 function applyPreviewEffects(forceFullQuality = false) {
-    if (!originalImage) {
-        return;
-    }
-
+    if (!originalImage) return;
+    
     if (isProcessing && !forceFullQuality) {
         needsUpdate = true;
         return;
@@ -329,45 +347,49 @@ function applyPreviewEffects(forceFullQuality = false) {
     if (!forceFullQuality && isSliding && now - lastRenderTime < RENDER_INTERVAL) {
         return;
     }
-    lastRenderTime = now;
 
     isProcessing = true;
 
-    if (!cachedImageData) {
-        previewCanvas.width = originalImage.width;
-        previewCanvas.height = originalImage.height;
-        previewCtx.drawImage(originalImage, 0, 0);
-        cachedImageData = previewCtx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
-        
-        const data = cachedImageData.data;
-        for (let i = 0; i < data.length; i += 4) {
-            const avg = (data[i] + data[i+1] + data[i+2]) / 3;
-            data[i] = data[i+1] = data[i+2] = avg;
+    requestAnimationFrame(() => {
+        try {
+            if (!cachedImageData) {
+                initializeCachedImageData();
+            }
+
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d', { alpha: false });
+            
+            const settings = {
+                contrast: parseFloat(document.getElementById('contrast').value),
+                exposure: parseFloat(document.getElementById('exposure').value),
+                grain: parseFloat(document.getElementById('grain').value),
+                radialBlur: parseFloat(document.getElementById('radialBlur').value),
+                opacity: parseFloat(document.getElementById('opacity').value),
+                texture: textureImage,
+                imageData: cachedImageData
+            };
+
+            applyEffects(ctx, canvas.width, canvas.height, settings, isSliding && !forceFullQuality);
+        } finally {
+            isProcessing = false;
+            if (needsUpdate) {
+                needsUpdate = false;
+                applyPreviewEffects(forceFullQuality);
+            }
         }
-    }
+    });
+}
 
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
+function initializeCachedImageData() {
+    previewCanvas.width = originalImage.width;
+    previewCanvas.height = originalImage.height;
+    previewCtx.drawImage(originalImage, 0, 0);
+    cachedImageData = previewCtx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
     
-    canvas.width = originalImage.width;
-    canvas.height = originalImage.height;
-
-    const settings = {
-        contrast: parseFloat(document.getElementById('contrast').value),
-        exposure: parseFloat(document.getElementById('exposure').value),
-        grain: parseFloat(document.getElementById('grain').value),
-        radialBlur: parseFloat(document.getElementById('radialBlur').value),
-        opacity: parseFloat(document.getElementById('opacity').value),
-        texture: textureImage,
-        imageData: cachedImageData
-    };
-
-    applyEffects(ctx, canvas.width, canvas.height, settings, isSliding && !forceFullQuality);
-
-    isProcessing = false;
-    if (needsUpdate) {
-        needsUpdate = false;
-        requestAnimationFrame(() => applyPreviewEffects(forceFullQuality));
+    const data = cachedImageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+        const avg = (data[i] + data[i+1] + data[i+2]) / 3;
+        data[i] = data[i+1] = data[i+2] = avg;
     }
 }
 
