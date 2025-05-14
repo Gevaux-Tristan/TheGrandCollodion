@@ -64,6 +64,11 @@ function applyEffects(ctx, width, height, settings) {
     imageData
   } = settings;
 
+  // S'assurer que le contexte est configuré correctement
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  // Appliquer l'image de base
   ctx.putImageData(imageData, 0, 0);
 
   // Appliquer le contraste et l'exposition
@@ -112,6 +117,7 @@ function applyEffects(ctx, width, height, settings) {
   if (texture && texture.complete && opacity > 0) {
     ctx.globalAlpha = opacity;
     ctx.globalCompositeOperation = "overlay";
+    // Utiliser drawImage avec les dimensions explicites
     ctx.drawImage(texture, 0, 0, width, height);
     ctx.globalAlpha = 1.0;
     ctx.globalCompositeOperation = "source-over";
@@ -206,14 +212,15 @@ function loadImage(file) {
     img.onload = function() {
       // Create a temporary canvas for compression
       const tempCanvas = document.createElement('canvas');
-      const tempCtx = tempCanvas.getContext('2d');
+      const tempCtx = tempCanvas.getContext('2d', { alpha: false });
       
-      // Calculate new dimensions while maintaining aspect ratio
+      // Calculer les dimensions en tenant compte de la résolution de l'écran
       let newWidth = img.width;
       let newHeight = img.height;
       
-      // Augmenter significativement la taille maximale sur mobile et desktop
-      const MAX_DIMENSION = window.innerWidth <= 900 ? 1600 : 2400;
+      // Ajuster la taille maximale en fonction de la résolution de l'écran
+      const pixelRatio = window.devicePixelRatio || 1;
+      const MAX_DIMENSION = (window.innerWidth <= 900 ? 2048 : 3072) * pixelRatio;
       
       if (img.width > MAX_DIMENSION || img.height > MAX_DIMENSION) {
         if (img.width > img.height) {
@@ -225,26 +232,24 @@ function loadImage(file) {
         }
       }
       
-      // Set canvas size to new dimensions
       tempCanvas.width = newWidth;
       tempCanvas.height = newHeight;
       
-      // Draw and compress image
+      // Améliorer la qualité du redimensionnement
+      tempCtx.imageSmoothingEnabled = true;
+      tempCtx.imageSmoothingQuality = 'high';
       tempCtx.drawImage(img, 0, 0, newWidth, newHeight);
       
-      // Create compressed image with higher quality
       const compressedImg = new Image();
       compressedImg.onload = function() {
         originalImage = compressedImg;
         previewContainer.classList.add('has-image');
-        // Reset the cached image data to force a new processing with current settings
         cachedImageData = null;
-        // Apply effects with current settings
         applyPreviewEffects();
       };
-      // Augmenter significativement la qualité de compression
-      const quality = window.innerWidth <= 900 ? 0.9 : 0.95;
-      compressedImg.src = tempCanvas.toDataURL('image/jpeg', quality);
+      
+      // Utiliser une qualité maximale pour l'image source
+      compressedImg.src = tempCanvas.toDataURL('image/jpeg', 1.0);
     };
     img.src = e.target.result;
   };
@@ -278,7 +283,7 @@ textureSelect.addEventListener("change", () => {
   textureImage.onload = () => applyPreviewEffects();
 });
 
-// Modifier la fonction de téléchargement pour utiliser exactement le même processus
+// Modifier la fonction de téléchargement
 document.getElementById("download").addEventListener("click", async () => {
   const downloadButton = document.getElementById("download");
   const originalText = downloadButton.innerHTML;
@@ -288,16 +293,33 @@ document.getElementById("download").addEventListener("click", async () => {
   downloadButton.style.opacity = '0.7';
 
   try {
-    // Créer un nouveau canvas pour l'export avec les mêmes dimensions
+    // Créer un nouveau canvas pour l'export
     const exportCanvas = document.createElement('canvas');
-    const exportCtx = exportCanvas.getContext('2d');
+    const exportCtx = exportCanvas.getContext('2d', { alpha: false });
     
-    // Utiliser exactement les mêmes dimensions que le canvas de prévisualisation
-    exportCanvas.width = canvas.width;
-    exportCanvas.height = canvas.height;
+    // Utiliser les dimensions originales de l'image
+    exportCanvas.width = originalImage.width;
+    exportCanvas.height = originalImage.height;
 
-    // Copier l'état exact du canvas de prévisualisation
-    exportCtx.drawImage(canvas, 0, 0);
+    // Recréer l'image exactement comme dans la prévisualisation
+    if (cachedImageData) {
+      // Appliquer les mêmes effets avec les paramètres actuels
+      const settings = {
+        contrast: parseFloat(contrastSlider.value),
+        exposure: parseFloat(exposureSlider.value),
+        grain: parseFloat(grainSlider.value),
+        radialBlur: parseFloat(radialBlurSlider.value),
+        opacity: parseFloat(opacitySlider.value),
+        texture: textureImage,
+        imageData: cachedImageData
+      };
+
+      // Utiliser la même fonction applyEffects que pour la prévisualisation
+      applyEffects(exportCtx, exportCanvas.width, exportCanvas.height, settings);
+    } else {
+      // Si pas de cachedImageData, copier directement le canvas actuel
+      exportCtx.drawImage(canvas, 0, 0, exportCanvas.width, exportCanvas.height);
+    }
 
     // Export en haute qualité
     const dataUrl = exportCanvas.toDataURL('image/jpeg', 1.0);
