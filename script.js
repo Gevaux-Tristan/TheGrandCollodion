@@ -15,7 +15,6 @@ const isMobile = window.innerWidth <= 900;
 
 const contrastSlider = document.getElementById("contrast");
 const opacitySlider = document.getElementById("opacity");
-const grainSlider = document.getElementById("grain");
 const exposureSlider = document.getElementById("exposure");
 const radialBlurSlider = document.getElementById("radialBlur");
 const textureSelect = document.getElementById("texture");
@@ -35,7 +34,6 @@ function initializeApp() {
         previewContainer: document.getElementById('preview-container'),
         contrastSlider: document.getElementById('contrast'),
         opacitySlider: document.getElementById('opacity'),
-        grainSlider: document.getElementById('grain'),
         exposureSlider: document.getElementById('exposure'),
         radialBlurSlider: document.getElementById('radialBlur'),
         downloadButton: document.getElementById('download'),
@@ -102,7 +100,6 @@ function setupSliders(elements) {
     const sliders = [
         elements.contrastSlider,
         elements.opacitySlider,
-        elements.grainSlider,
         elements.exposureSlider,
         elements.radialBlurSlider
     ];
@@ -179,8 +176,9 @@ function loadImage(file) {
             let newWidth = img.width;
             let newHeight = img.height;
             
-            const pixelRatio = window.devicePixelRatio || 1;
-            const MAX_DIMENSION = (window.innerWidth <= 900 ? 2048 : 3072) * pixelRatio;
+            const DOWNSAMPLE_PIXEL_RATIO_CAP = 1.5; // Cap pixel ratio to manage canvas size
+            const effectivePixelRatio = Math.min(window.devicePixelRatio || 1, DOWNSAMPLE_PIXEL_RATIO_CAP);
+            const MAX_DIMENSION = (window.innerWidth <= 900 ? 2048 : 3072) * effectivePixelRatio;
             
             if (img.width > MAX_DIMENSION || img.height > MAX_DIMENSION) {
                 if (img.width > img.height) {
@@ -238,78 +236,91 @@ function applyRadialBlur(ctx, width, height, intensity) {
     tempCanvas.remove();
 }
 
-function applyEffects(ctx, width, height, settings, isLowRes = false) {
-    const {
-        contrast,
-        exposure,
-        grain,
-        radialBlur,
-        opacity,
-        texture,
-        imageData
-    } = settings;
+function applyEffects(ctx, canvasWidth, canvasHeight, settings, isLowRes = false) {
+    const { contrast, exposure, radialBlur, opacity, texture, imageData: baseGrayscaleImageData } = settings;
+    // baseGrayscaleImageData is the full-resolution, grayscaled cachedImageData
 
-    const scale = isLowRes ? (isMobile ? MOBILE_SCALE : DESKTOP_SCALE) : 1;
-    const targetWidth = Math.floor(width * scale);
-    const targetHeight = Math.floor(height * scale);
+    let sourceImageData = baseGrayscaleImageData;
+    let sourceWidth = baseGrayscaleImageData.width;
+    let sourceHeight = baseGrayscaleImageData.height;
 
-    ctx.canvas.width = width;
-    ctx.canvas.height = height;
+    if (isLowRes) {
+        const scale = isMobile ? MOBILE_SCALE : DESKTOP_SCALE;
+        sourceWidth = Math.max(1, Math.floor(baseGrayscaleImageData.width * scale));
+        sourceHeight = Math.max(1, Math.floor(baseGrayscaleImageData.height * scale));
 
-    if (isLowRes && isMobile) {
-        ctx.drawImage(originalImage, 0, 0, width, height);
+        const lowResCanvas = document.createElement('canvas');
+        lowResCanvas.width = sourceWidth;
+        lowResCanvas.height = sourceHeight;
+        const lowResCtx = lowResCanvas.getContext('2d');
+
+        // To scale ImageData, we must draw it to a canvas, then draw that canvas scaled.
+        // Create a temporary canvas to hold the full-res baseGrayscaleImageData to draw it scaled down.
+        const tempFullResCanvas = document.createElement('canvas');
+        tempFullResCanvas.width = baseGrayscaleImageData.width;
+        tempFullResCanvas.height = baseGrayscaleImageData.height;
+        tempFullResCanvas.getContext('2d').putImageData(baseGrayscaleImageData, 0, 0);
         
-        const processedData = ctx.getImageData(0, 0, width, height);
-        const data = processedData.data;
-        const contrastFactor = contrast;
-        const exposureFactor = Math.pow(2, exposure);
-        
-        for (let i = 0; i < data.length; i += 8) {
-            const val = Math.min(255, Math.max(0, ((data[i] - 128) * contrastFactor + 128) * exposureFactor));
-            for (let j = 0; j < 8 && (i + j) < data.length; j += 4) {
-                data[i + j] = data[i + j + 1] = data[i + j + 2] = val;
-            }
-        }
-        
-        ctx.putImageData(processedData, 0, 0);
-    } else {
-        ctx.putImageData(imageData, 0, 0);
-
-        const processedData = ctx.getImageData(0, 0, width, height);
-        const data = processedData.data;
-        const contrastFactor = contrast;
-        const exposureFactor = Math.pow(2, exposure);
-        
-        for (let i = 0; i < data.length; i += 4) {
-            const val = Math.min(255, Math.max(0, ((data[i] - 128) * contrastFactor + 128) * exposureFactor));
-            data[i] = data[i + 1] = data[i + 2] = val;
-        }
-        
-        ctx.putImageData(processedData, 0, 0);
-
-        if (!isLowRes) {
-            if (radialBlur > 0) {
-                applyRadialBlur(ctx, width, height, radialBlur);
-            }
-
-            if (grain > 0) {
-                const grainData = ctx.getImageData(0, 0, width, height);
-                const noiseData = grainData.data;
-                for (let i = 0; i < noiseData.length; i += 4) {
-                    const noise = (Math.random() - 0.5) * grain * 255;
-                    noiseData[i] = Math.min(255, Math.max(0, noiseData[i] + noise));
-                    noiseData[i + 1] = Math.min(255, Math.max(0, noiseData[i + 1] + noise));
-                    noiseData[i + 2] = Math.min(255, Math.max(0, noiseData[i + 2] + noise));
-                }
-                ctx.putImageData(grainData, 0, 0);
-            }
-        }
+        lowResCtx.imageSmoothingEnabled = true;
+        lowResCtx.imageSmoothingQuality = 'medium'; // Use medium for downscaling quality
+        lowResCtx.drawImage(tempFullResCanvas, 0, 0, sourceWidth, sourceHeight);
+        sourceImageData = lowResCtx.getImageData(0, 0, sourceWidth, sourceHeight);
+        // Now sourceImageData is a downscaled version of the grayscaled image.
+        tempFullResCanvas.remove();
+        lowResCanvas.remove();
     }
 
+    // Perform contrast and exposure on sourceImageData.data
+    const currentPixelData = sourceImageData.data;
+    const newPixelDataArray = new Uint8ClampedArray(currentPixelData.length);
+    const contrastFactor = contrast;
+    const exposureFactor = Math.pow(2, exposure);
+
+    for (let i = 0; i < currentPixelData.length; i += 4) {
+        const originalVal = currentPixelData[i]; // This is from a grayscaled source
+        const val = Math.min(255, Math.max(0, ((originalVal - 128) * contrastFactor + 128) * exposureFactor));
+        newPixelDataArray[i]     = val;
+        newPixelDataArray[i + 1] = val;
+        newPixelDataArray[i + 2] = val;
+        newPixelDataArray[i + 3] = currentPixelData[i + 3]; // Alpha
+    }
+    
+    const processedPixelImageData = new ImageData(newPixelDataArray, sourceImageData.width, sourceImageData.height);
+
+    // Prepare main canvas for drawing
+    ctx.canvas.width = canvasWidth;
+    ctx.canvas.height = canvasHeight;
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+    // Draw the processed image data to the main canvas.
+    if (isLowRes) {
+        // Create a temporary canvas to hold the small processedPixelImageData to draw it scaled up.
+        const tempProcessedCanvas = document.createElement('canvas');
+        tempProcessedCanvas.width = processedPixelImageData.width;
+        tempProcessedCanvas.height = processedPixelImageData.height;
+        tempProcessedCanvas.getContext('2d').putImageData(processedPixelImageData, 0, 0);
+        
+        ctx.imageSmoothingEnabled = true; 
+        ctx.imageSmoothingQuality = 'low'; // Faster for preview upscaling
+        ctx.drawImage(tempProcessedCanvas, 0, 0, canvasWidth, canvasHeight);
+        tempProcessedCanvas.remove();
+    } else {
+        // Full quality, draw directly.
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.putImageData(processedPixelImageData, 0, 0);
+    }
+    
+    // Apply radial blur only for full quality (not during low-res sliding preview)
+    if (!isLowRes && radialBlur > 0) {
+        applyRadialBlur(ctx, canvasWidth, canvasHeight, radialBlur);
+    }
+
+    // Texture overlay
     if (texture && texture.complete && opacity > 0) {
         ctx.globalAlpha = opacity;
         ctx.globalCompositeOperation = "overlay";
-        ctx.drawImage(texture, 0, 0, width, height);
+        ctx.drawImage(texture, 0, 0, canvasWidth, canvasHeight);
         ctx.globalAlpha = 1.0;
         ctx.globalCompositeOperation = "source-over";
     }
@@ -355,7 +366,6 @@ function applyPreviewEffects(forceFullQuality = false) {
     const settings = {
         contrast: parseFloat(document.getElementById('contrast').value),
         exposure: parseFloat(document.getElementById('exposure').value),
-        grain: parseFloat(document.getElementById('grain').value),
         radialBlur: parseFloat(document.getElementById('radialBlur').value),
         opacity: parseFloat(document.getElementById('opacity').value),
         texture: textureImage,
