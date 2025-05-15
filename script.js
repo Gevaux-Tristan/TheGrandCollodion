@@ -207,116 +207,116 @@ function loadImage(file) {
     reader.readAsDataURL(file);
 }
 
-function applyRadialBlur(ctx, width, height, intensity) {
-    const tempCanvas = document.createElement('canvas');
-    const tempCtx = tempCanvas.getContext('2d');
-    tempCanvas.width = width;
-    tempCanvas.height = height;
+function applyRadialBlur(targetCtx, width, height, intensity, isPreviewBlur = false) {
+    const tempCopyCanvas = document.createElement('canvas');
+    const tempCopyCtx = tempCopyCanvas.getContext('2d');
+    tempCopyCanvas.width = width;
+    tempCopyCanvas.height = height;
     
-    tempCtx.drawImage(ctx.canvas, 0, 0);
-    ctx.save();
+    // Copy current content of targetCtx (which should have contrast/exposure applied)
+    tempCopyCtx.drawImage(targetCtx.canvas, 0, 0);
+
+    targetCtx.save(); // Save state of targetCtx
     
     const centerX = width / 2;
     const centerY = height / 2;
     const radius = Math.max(width, height) / 2;
     
-    const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
-    gradient.addColorStop(0, `rgba(0, 0, 0, ${intensity / 10})`);
+    const gradient = targetCtx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+    
+    // Adjust intensity for gradient and blur radius for preview
+    const gradientEffectIntensity = isPreviewBlur ? intensity / 15 : intensity / 10;
+    let blurPx = intensity * 2;
+    if (isPreviewBlur) {
+        blurPx = Math.max(1, intensity * 1); // Less blur for preview, e.g., max 5px if intensity max is 5
+    }
+
+    gradient.addColorStop(0, `rgba(0, 0, 0, ${gradientEffectIntensity})`);
     gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
     
-    ctx.filter = `blur(${intensity * 2}px)`;
-    ctx.drawImage(tempCanvas, 0, 0);
-    ctx.filter = 'none';
+    targetCtx.filter = `blur(${blurPx}px)`;
+    targetCtx.drawImage(tempCopyCanvas, 0, 0); // Draw the copied content, now blurred, back onto targetCtx
+    targetCtx.filter = 'none';
     
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
+    targetCtx.globalCompositeOperation = 'destination-out';
+    targetCtx.fillStyle = gradient;
+    targetCtx.fillRect(0, 0, width, height); // Apply radial mask
     
-    ctx.restore();
-    tempCanvas.remove();
+    targetCtx.restore(); // Restore state of targetCtx
+    tempCopyCanvas.remove();
 }
 
 function applyEffects(ctx, canvasWidth, canvasHeight, settings, isLowRes = false) {
     const { contrast, exposure, radialBlur, opacity, texture, imageData: baseGrayscaleImageData } = settings;
-    // baseGrayscaleImageData is the full-resolution, grayscaled cachedImageData
 
-    let sourceImageData = baseGrayscaleImageData;
     let sourceWidth = baseGrayscaleImageData.width;
     let sourceHeight = baseGrayscaleImageData.height;
+    
+    let workingCanvasForEffects = document.createElement('canvas');
+    let workingCtxForEffects = workingCanvasForEffects.getContext('2d');
 
     if (isLowRes) {
         const scale = isMobile ? MOBILE_SCALE : DESKTOP_SCALE;
         sourceWidth = Math.max(1, Math.floor(baseGrayscaleImageData.width * scale));
         sourceHeight = Math.max(1, Math.floor(baseGrayscaleImageData.height * scale));
 
-        const lowResCanvas = document.createElement('canvas');
-        lowResCanvas.width = sourceWidth;
-        lowResCanvas.height = sourceHeight;
-        const lowResCtx = lowResCanvas.getContext('2d');
-
-        // To scale ImageData, we must draw it to a canvas, then draw that canvas scaled.
-        // Create a temporary canvas to hold the full-res baseGrayscaleImageData to draw it scaled down.
+        workingCanvasForEffects.width = sourceWidth;
+        workingCanvasForEffects.height = sourceHeight;
+        
         const tempFullResCanvas = document.createElement('canvas');
         tempFullResCanvas.width = baseGrayscaleImageData.width;
         tempFullResCanvas.height = baseGrayscaleImageData.height;
         tempFullResCanvas.getContext('2d').putImageData(baseGrayscaleImageData, 0, 0);
         
-        lowResCtx.imageSmoothingEnabled = true;
-        lowResCtx.imageSmoothingQuality = 'medium'; // Use medium for downscaling quality
-        lowResCtx.drawImage(tempFullResCanvas, 0, 0, sourceWidth, sourceHeight);
-        sourceImageData = lowResCtx.getImageData(0, 0, sourceWidth, sourceHeight);
-        // Now sourceImageData is a downscaled version of the grayscaled image.
+        workingCtxForEffects.imageSmoothingEnabled = true;
+        workingCtxForEffects.imageSmoothingQuality = 'medium'; // Quality for downscaling
+        workingCtxForEffects.drawImage(tempFullResCanvas, 0, 0, sourceWidth, sourceHeight);
         tempFullResCanvas.remove();
-        lowResCanvas.remove();
+    } else {
+        workingCanvasForEffects.width = sourceWidth; // Full resolution
+        workingCanvasForEffects.height = sourceHeight;
+        workingCtxForEffects.putImageData(baseGrayscaleImageData, 0, 0);
     }
 
-    // Perform contrast and exposure on sourceImageData.data
-    const currentPixelData = sourceImageData.data;
-    const newPixelDataArray = new Uint8ClampedArray(currentPixelData.length);
+    // Apply Contrast and Exposure to workingCtxForEffects
+    const imageDataForProcessing = workingCtxForEffects.getImageData(0, 0, sourceWidth, sourceHeight);
+    const pixelData = imageDataForProcessing.data;
     const contrastFactor = contrast;
     const exposureFactor = Math.pow(2, exposure);
 
-    for (let i = 0; i < currentPixelData.length; i += 4) {
-        const originalVal = currentPixelData[i]; // This is from a grayscaled source
+    for (let i = 0; i < pixelData.length; i += 4) {
+        const originalVal = pixelData[i]; // Assumes grayscaled source data (R=G=B)
         const val = Math.min(255, Math.max(0, ((originalVal - 128) * contrastFactor + 128) * exposureFactor));
-        newPixelDataArray[i]     = val;
-        newPixelDataArray[i + 1] = val;
-        newPixelDataArray[i + 2] = val;
-        newPixelDataArray[i + 3] = currentPixelData[i + 3]; // Alpha
+        pixelData[i] = val;
+        pixelData[i + 1] = val;
+        pixelData[i + 2] = val;
+        // Alpha (pixelData[i+3]) remains unchanged
     }
-    
-    const processedPixelImageData = new ImageData(newPixelDataArray, sourceImageData.width, sourceImageData.height);
+    workingCtxForEffects.putImageData(imageDataForProcessing, 0, 0);
 
-    // Prepare main canvas for drawing
-    ctx.canvas.width = canvasWidth;
+    // Apply Radial Blur to workingCtxForEffects
+    if (radialBlur > 0) {
+        applyRadialBlur(workingCtxForEffects, sourceWidth, sourceHeight, radialBlur, isLowRes /* pass isLowRes as isPreviewBlur */);
+    }
+
+    // Prepare main display canvas (ctx) and draw the content of workingCanvasForEffects to it
+    ctx.canvas.width = canvasWidth; 
     ctx.canvas.height = canvasHeight;
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-    // Draw the processed image data to the main canvas.
     if (isLowRes) {
-        // Create a temporary canvas to hold the small processedPixelImageData to draw it scaled up.
-        const tempProcessedCanvas = document.createElement('canvas');
-        tempProcessedCanvas.width = processedPixelImageData.width;
-        tempProcessedCanvas.height = processedPixelImageData.height;
-        tempProcessedCanvas.getContext('2d').putImageData(processedPixelImageData, 0, 0);
-        
         ctx.imageSmoothingEnabled = true; 
         ctx.imageSmoothingQuality = 'low'; // Faster for preview upscaling
-        ctx.drawImage(tempProcessedCanvas, 0, 0, canvasWidth, canvasHeight);
-        tempProcessedCanvas.remove();
+        ctx.drawImage(workingCanvasForEffects, 0, 0, canvasWidth, canvasHeight);
     } else {
-        // Full quality, draw directly.
         ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.putImageData(processedPixelImageData, 0, 0);
+        ctx.imageSmoothingQuality = 'high'; // High quality for final render
+        ctx.drawImage(workingCanvasForEffects, 0, 0, canvasWidth, canvasHeight);
     }
     
-    // Apply radial blur only for full quality (not during low-res sliding preview)
-    if (!isLowRes && radialBlur > 0) {
-        applyRadialBlur(ctx, canvasWidth, canvasHeight, radialBlur);
-    }
+    workingCanvasForEffects.remove(); // Clean up the temporary working canvas
 
-    // Texture overlay
+    // Apply Texture Overlay to the main display canvas (ctx)
     if (texture && texture.complete && opacity > 0) {
         ctx.globalAlpha = opacity;
         ctx.globalCompositeOperation = "overlay";
