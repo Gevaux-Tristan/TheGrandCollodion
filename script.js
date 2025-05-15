@@ -246,6 +246,8 @@ function applyRadialBlur(targetCtx, width, height, intensity, isPreviewBlur = fa
     tempCopyCanvas.remove();
 }
 
+const DEFAULT_GRAIN_AMOUNT = 0.05; // Light, fixed grain amount
+
 function applyEffects(ctx, canvasWidth, canvasHeight, settings, isLowRes = false) {
     const { contrast, exposure, radialBlur, opacity, texture, imageData: baseGrayscaleImageData } = settings;
 
@@ -297,6 +299,21 @@ function applyEffects(ctx, canvasWidth, canvasHeight, settings, isLowRes = false
     // Apply Radial Blur to workingCtxForEffects
     if (radialBlur > 0) {
         applyRadialBlur(workingCtxForEffects, sourceWidth, sourceHeight, radialBlur, isLowRes /* pass isLowRes as isPreviewBlur */);
+    }
+
+    // Apply fixed light grain to workingCtxForEffects
+    if (DEFAULT_GRAIN_AMOUNT > 0) {
+        const grainImageData = workingCtxForEffects.getImageData(0, 0, sourceWidth, sourceHeight);
+        const grainPixelData = grainImageData.data;
+        for (let i = 0; i < grainPixelData.length; i += 4) {
+            // Generate noise between -0.5 and 0.5, scale by amount and 255
+            const noise = (Math.random() - 0.5) * DEFAULT_GRAIN_AMOUNT * 255;
+            grainPixelData[i] = Math.min(255, Math.max(0, grainPixelData[i] + noise));
+            grainPixelData[i + 1] = Math.min(255, Math.max(0, grainPixelData[i + 1] + noise));
+            grainPixelData[i + 2] = Math.min(255, Math.max(0, grainPixelData[i + 2] + noise));
+            // Alpha (grainPixelData[i+3]) remains unchanged
+        }
+        workingCtxForEffects.putImageData(grainImageData, 0, 0);
     }
 
     // Prepare main display canvas (ctx) and draw the content of workingCanvasForEffects to it
