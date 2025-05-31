@@ -125,7 +125,11 @@ function setupDownloadButton(downloadButton, canvas) {
         try {
             const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
             const link = document.createElement('a');
-            link.download = 'collodion-export.jpg';
+            // Generate filename in the format: The GrandCollodion-[date here]-[Hour here].jpg
+            const now = new Date();
+            const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+            const hourStr = String(now.getHours()).padStart(2, '0') + '-' + String(now.getMinutes()).padStart(2, '0');
+            link.download = `The GrandCollodion-${dateStr}-${hourStr}.jpg`;
             link.href = dataUrl;
             link.click();
         } catch (error) {
