@@ -31,6 +31,7 @@ function initializeApp() {
     const elements = {
         canvas: document.getElementById('canvas'),
         imageInput: document.getElementById('upload'),
+        cameraInput: document.getElementById('camera'),
         previewContainer: document.getElementById('preview-container'),
         contrastSlider: document.getElementById('contrast'),
         opacitySlider: document.getElementById('opacity'),
@@ -60,6 +61,7 @@ function initializeApp() {
     // Configurer les event listeners
     setupDragAndDrop(elements.previewContainer);
     setupFileUpload(elements.imageInput);
+    setupFileUpload(elements.cameraInput);
     setupSliders(elements);
     setupDownloadButton(elements.downloadButton, elements.canvas);
     setupTextureSelect(elements.textureSelect);

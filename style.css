@@ -91,6 +91,10 @@ body {
   display: none;
 }
 
+.mobile-only {
+  display: none;
+}
+
 .control {
   width: 100%;
   display: flex;
@@ -758,5 +762,18 @@ select option {
   #download {
     margin-top: 12px;
     margin-bottom: 100px;
+  }
+}
+
+@media (max-width: 768px) {
+  .mobile-only {
+    display: block;
+  }
+  
+  #controls-panel {
+    width: 100%;
+    padding: 16px;
+    border-left: none;
+    border-top: 1px solid #FFBF00;
   }
 }
