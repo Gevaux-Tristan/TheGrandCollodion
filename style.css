@@ -709,8 +709,21 @@ select option {
     margin-bottom: 10px;
   }
 
+  /* Increase button sizes for mobile */
+  .upload-label, #download {
+    padding: 16px;
+    font-size: 16px;
+    min-height: 54px;
+  }
+
+  .upload-label .material-icon, #download .material-icon {
+    font-size: 24px;
+  }
+
   .custom-select .selected, .option {
-    padding: 14px;
+    padding: 16px;
+    font-size: 16px;
+    min-height: 54px;
   }
 
   #drag-message {
@@ -746,8 +759,21 @@ select option {
     margin-bottom: 12px;
   }
 
+  /* Even larger buttons for smaller screens */
+  .upload-label, #download {
+    padding: 18px;
+    font-size: 18px;
+    min-height: 60px;
+  }
+
+  .upload-label .material-icon, #download .material-icon {
+    font-size: 28px;
+  }
+
   .custom-select .selected, .option {
-    padding: 16px;
+    padding: 18px;
+    font-size: 18px;
+    min-height: 60px;
   }
 
   #logo {
@@ -756,7 +782,7 @@ select option {
   }
 
   .control label {
-    font-size: 14px;
+    font-size: 16px;
   }
 
   #download {
