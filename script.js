@@ -369,39 +369,40 @@ function applyEffects(ctx, canvasWidth, canvasHeight, settings, isLowRes = false
         blurCanvas.height = sourceHeight;
         const blurCtx = blurCanvas.getContext('2d');
         
+        // Draw the current state to the blur canvas
         blurCtx.drawImage(workingCanvasForEffects, 0, 0);
         
-        const blurImageData = blurCtx.getImageData(0, 0, sourceWidth, sourceHeight);
-        const blurPixels = blurImageData.data;
-        
+        // Create a radial gradient for the blur effect
         const centerX = sourceWidth / 2;
         const centerY = sourceHeight / 2;
-        const maxDistance = Math.sqrt(centerX * centerX + centerY * centerY);
+        const maxRadius = Math.sqrt(centerX * centerX + centerY * centerY);
         
-        for (let y = 0; y < sourceHeight; y++) {
-            for (let x = 0; x < sourceWidth; x++) {
-                const dx = x - centerX;
-                const dy = y - centerY;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                const angle = Math.atan2(dy, dx);
-                
-                const blurAmount = (distance / maxDistance) * radialBlur;
-                const offsetX = Math.cos(angle) * blurAmount;
-                const offsetY = Math.sin(angle) * blurAmount;
-                
-                const sourceX = Math.max(0, Math.min(sourceWidth - 1, x + offsetX));
-                const sourceY = Math.max(0, Math.min(sourceHeight - 1, y + offsetY));
-                
-                const sourceIndex = (Math.floor(sourceY) * sourceWidth + Math.floor(sourceX)) * 4;
-                const targetIndex = (y * sourceWidth + x) * 4;
-                
-                for (let i = 0; i < 4; i++) {
-                    blurPixels[targetIndex + i] = blurPixels[sourceIndex + i];
-                }
-            }
-        }
+        // Calculate blur amount based on distance from center
+        const blurAmount = radialBlur * (isLowRes ? 0.5 : 1);
         
-        blurCtx.putImageData(blurImageData, 0, 0);
+        // Create a radial gradient for the blur mask
+        const gradient = blurCtx.createRadialGradient(
+            centerX, centerY, 0,
+            centerX, centerY, maxRadius
+        );
+        
+        // Add color stops for smooth transition
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        gradient.addColorStop(0.3, 'rgba(0, 0, 0, 0.1)');
+        gradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.3)');
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0.5)');
+        
+        // Apply the blur effect
+        blurCtx.globalCompositeOperation = 'overlay';
+        blurCtx.fillStyle = gradient;
+        blurCtx.fillRect(0, 0, sourceWidth, sourceHeight);
+        
+        // Apply Gaussian blur
+        blurCtx.filter = `blur(${blurAmount}px)`;
+        blurCtx.drawImage(blurCanvas, 0, 0);
+        blurCtx.filter = 'none';
+        
+        // Draw the blurred result back to the working canvas
         workingCtxForEffects.drawImage(blurCanvas, 0, 0);
         blurCanvas.remove();
     }
