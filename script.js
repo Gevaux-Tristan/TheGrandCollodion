@@ -13,6 +13,55 @@ const MOBILE_SCALE = 0.25;
 const DESKTOP_SCALE = 0.5;
 const isMobile = window.innerWidth <= 900;
 
+// Texture optimization
+const textureCache = new Map();
+const PREVIEW_TEXTURE_SIZE = 1024; // Maximum size for preview textures
+
+// Function to load and optimize texture
+async function loadOptimizedTexture(src) {
+    if (textureCache.has(src)) {
+        return textureCache.get(src);
+    }
+
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            // Create a canvas for the preview texture
+            const previewCanvas = document.createElement('canvas');
+            const previewCtx = previewCanvas.getContext('2d');
+            
+            // Calculate dimensions while maintaining aspect ratio
+            let width = img.width;
+            let height = img.height;
+            if (width > PREVIEW_TEXTURE_SIZE || height > PREVIEW_TEXTURE_SIZE) {
+                if (width > height) {
+                    width = PREVIEW_TEXTURE_SIZE;
+                    height = (img.height * PREVIEW_TEXTURE_SIZE) / img.width;
+                } else {
+                    height = PREVIEW_TEXTURE_SIZE;
+                    width = (img.width * PREVIEW_TEXTURE_SIZE) / img.height;
+                }
+            }
+            
+            previewCanvas.width = width;
+            previewCanvas.height = height;
+            previewCtx.drawImage(img, 0, 0, width, height);
+            
+            const previewTexture = new Image();
+            previewTexture.src = previewCanvas.toDataURL('image/png', 0.8);
+            
+            const result = {
+                original: img,
+                preview: previewTexture
+            };
+            
+            textureCache.set(src, result);
+            resolve(result);
+        };
+        img.src = src;
+    });
+}
+
 const contrastSlider = document.getElementById("contrast");
 const opacitySlider = document.getElementById("opacity");
 const exposureSlider = document.getElementById("exposure");
@@ -54,8 +103,10 @@ function initializeApp() {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
-    // Initialiser la texture
-    textureImage.src = "Collodion-01.png";
+    // Initialize texture with optimization
+    loadOptimizedTexture("Collodion-01.png").then(texture => {
+        textureImage = texture.preview;
+    });
     elements.opacitySlider.value = "0.75";
 
     // Configurer les event listeners
@@ -143,9 +194,16 @@ function setupDownloadButton(downloadButton, canvas) {
 }
 
 function setupTextureSelect(textureSelect) {
-    textureSelect.addEventListener('change', () => {
-        textureImage.src = textureSelect.value;
-        textureImage.onload = () => applyPreviewEffects(true);
+    // Preload all textures
+    const textureOptions = Array.from(textureSelect.options);
+    textureOptions.forEach(option => {
+        loadOptimizedTexture(option.value);
+    });
+
+    textureSelect.addEventListener('change', async () => {
+        const texture = await loadOptimizedTexture(textureSelect.value);
+        textureImage = texture.preview;
+        applyPreviewEffects(true);
     });
 }
 
@@ -277,69 +335,91 @@ function applyEffects(ctx, canvasWidth, canvasHeight, settings, isLowRes = false
         tempFullResCanvas.getContext('2d').putImageData(baseGrayscaleImageData, 0, 0);
         
         workingCtxForEffects.imageSmoothingEnabled = true;
-        workingCtxForEffects.imageSmoothingQuality = 'medium'; // Quality for downscaling
+        workingCtxForEffects.imageSmoothingQuality = 'medium';
         workingCtxForEffects.drawImage(tempFullResCanvas, 0, 0, sourceWidth, sourceHeight);
         tempFullResCanvas.remove();
     } else {
-        workingCanvasForEffects.width = sourceWidth; // Full resolution
+        workingCanvasForEffects.width = sourceWidth;
         workingCanvasForEffects.height = sourceHeight;
         workingCtxForEffects.putImageData(baseGrayscaleImageData, 0, 0);
     }
 
-    // Apply Contrast and Exposure to workingCtxForEffects
+    // Apply Contrast and Exposure
     const imageDataForProcessing = workingCtxForEffects.getImageData(0, 0, sourceWidth, sourceHeight);
     const pixelData = imageDataForProcessing.data;
     const contrastFactor = contrast;
     const exposureFactor = Math.pow(2, exposure);
 
     for (let i = 0; i < pixelData.length; i += 4) {
-        const originalVal = pixelData[i]; // Assumes grayscaled source data (R=G=B)
-        const val = Math.min(255, Math.max(0, ((originalVal - 128) * contrastFactor + 128) * exposureFactor));
-        pixelData[i] = val;
-        pixelData[i + 1] = val;
-        pixelData[i + 2] = val;
-        // Alpha (pixelData[i+3]) remains unchanged
+        // Apply contrast and exposure
+        for (let j = 0; j < 3; j++) {
+            let value = pixelData[i + j];
+            value = ((value / 255 - 0.5) * contrastFactor + 0.5) * 255;
+            value = value * exposureFactor;
+            pixelData[i + j] = Math.max(0, Math.min(255, value));
+        }
     }
+
     workingCtxForEffects.putImageData(imageDataForProcessing, 0, 0);
 
-    // Apply Radial Blur to workingCtxForEffects
+    // Apply Radial Blur if needed
     if (radialBlur > 0) {
-        applyRadialBlur(workingCtxForEffects, sourceWidth, sourceHeight, radialBlur, isLowRes /* pass isLowRes as isPreviewBlur */);
-    }
-
-    // Apply fixed light grain to workingCtxForEffects
-    if (DEFAULT_GRAIN_AMOUNT > 0) {
-        const grainImageData = workingCtxForEffects.getImageData(0, 0, sourceWidth, sourceHeight);
-        const grainPixelData = grainImageData.data;
-        for (let i = 0; i < grainPixelData.length; i += 4) {
-            // Generate noise between -0.5 and 0.5, scale by amount and 255
-            const noise = (Math.random() - 0.5) * DEFAULT_GRAIN_AMOUNT * 255;
-            grainPixelData[i] = Math.min(255, Math.max(0, grainPixelData[i] + noise));
-            grainPixelData[i + 1] = Math.min(255, Math.max(0, grainPixelData[i + 1] + noise));
-            grainPixelData[i + 2] = Math.min(255, Math.max(0, grainPixelData[i + 2] + noise));
-            // Alpha (grainPixelData[i+3]) remains unchanged
+        const blurCanvas = document.createElement('canvas');
+        blurCanvas.width = sourceWidth;
+        blurCanvas.height = sourceHeight;
+        const blurCtx = blurCanvas.getContext('2d');
+        
+        blurCtx.drawImage(workingCanvasForEffects, 0, 0);
+        
+        const blurImageData = blurCtx.getImageData(0, 0, sourceWidth, sourceHeight);
+        const blurPixels = blurImageData.data;
+        
+        const centerX = sourceWidth / 2;
+        const centerY = sourceHeight / 2;
+        const maxDistance = Math.sqrt(centerX * centerX + centerY * centerY);
+        
+        for (let y = 0; y < sourceHeight; y++) {
+            for (let x = 0; x < sourceWidth; x++) {
+                const dx = x - centerX;
+                const dy = y - centerY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const angle = Math.atan2(dy, dx);
+                
+                const blurAmount = (distance / maxDistance) * radialBlur;
+                const offsetX = Math.cos(angle) * blurAmount;
+                const offsetY = Math.sin(angle) * blurAmount;
+                
+                const sourceX = Math.max(0, Math.min(sourceWidth - 1, x + offsetX));
+                const sourceY = Math.max(0, Math.min(sourceHeight - 1, y + offsetY));
+                
+                const sourceIndex = (Math.floor(sourceY) * sourceWidth + Math.floor(sourceX)) * 4;
+                const targetIndex = (y * sourceWidth + x) * 4;
+                
+                for (let i = 0; i < 4; i++) {
+                    blurPixels[targetIndex + i] = blurPixels[sourceIndex + i];
+                }
+            }
         }
-        workingCtxForEffects.putImageData(grainImageData, 0, 0);
+        
+        blurCtx.putImageData(blurImageData, 0, 0);
+        workingCtxForEffects.drawImage(blurCanvas, 0, 0);
+        blurCanvas.remove();
     }
 
-    // Prepare main display canvas (ctx) and draw the content of workingCanvasForEffects to it
-    ctx.canvas.width = canvasWidth; 
-    ctx.canvas.height = canvasHeight;
-    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-
+    // Draw the processed image to the main canvas
     if (isLowRes) {
-        ctx.imageSmoothingEnabled = true; 
-        ctx.imageSmoothingQuality = 'low'; // Faster for preview upscaling
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'low';
         ctx.drawImage(workingCanvasForEffects, 0, 0, canvasWidth, canvasHeight);
     } else {
         ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high'; // High quality for final render
+        ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(workingCanvasForEffects, 0, 0, canvasWidth, canvasHeight);
     }
     
-    workingCanvasForEffects.remove(); // Clean up the temporary working canvas
+    workingCanvasForEffects.remove();
 
-    // Apply Texture Overlay to the main display canvas (ctx)
+    // Apply Texture Overlay
     if (texture && texture.complete && opacity > 0) {
         ctx.globalAlpha = opacity;
         ctx.globalCompositeOperation = "overlay";
