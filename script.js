@@ -386,14 +386,14 @@ function applyEffects(ctx, canvasWidth, canvasHeight, settings, isLowRes = false
             centerX, centerY, maxRadius
         );
         
-        // Add color stops for smooth transition
-        gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        gradient.addColorStop(0.3, 'rgba(0, 0, 0, 0.1)');
-        gradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.3)');
-        gradient.addColorStop(1, 'rgba(0, 0, 0, 0.5)');
+        // Add color stops for smooth transition with white instead of black
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 0)');
+        gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.1)');
+        gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.3)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0.5)');
         
-        // Apply the blur effect
-        blurCtx.globalCompositeOperation = 'overlay';
+        // Apply the blur effect with screen composite operation
+        blurCtx.globalCompositeOperation = 'screen';
         blurCtx.fillStyle = gradient;
         blurCtx.fillRect(0, 0, sourceWidth, sourceHeight);
         
