@@ -439,64 +439,74 @@ document.addEventListener('DOMContentLoaded', function() {
   const customSelect = document.querySelector('.custom-select');
   const select = document.querySelector('#texture');
   const options = document.querySelectorAll('.option');
-  const selected = document.createElement('div');
-  selected.className = 'selected';
-  selected.textContent = select.options[select.selectedIndex].text;
-  customSelect.insertBefore(selected, customSelect.firstChild);
+  const settingsToggle = document.querySelector('#settings-toggle');
+  const settingsContent = document.querySelector('#settings-content');
+  const radialBlurSlider = document.querySelector('#radialBlur');
 
-  // Ouvre/ferme le menu uniquement si on clique sur .selected
-  selected.addEventListener('click', function(e) {
-    e.stopPropagation();
-    customSelect.classList.toggle('active');
-    
-    // Mettre à jour la visibilité des options
-    const currentValue = select.value;
-    options.forEach(option => {
-      if (option.getAttribute('data-value') === currentValue) {
-        option.style.display = 'none';
-      } else {
-        option.style.display = 'block';
-      }
-    });
-  });
+  if (customSelect && select) {
+    const selected = document.createElement('div');
+    selected.className = 'selected';
+    selected.textContent = select.options[select.selectedIndex].text;
+    customSelect.insertBefore(selected, customSelect.firstChild);
 
-  options.forEach(option => {
-    option.addEventListener('click', function(e) {
+    // Ouvre/ferme le menu uniquement si on clique sur .selected
+    selected.addEventListener('click', function(e) {
       e.stopPropagation();
-      const value = this.getAttribute('data-value');
-      select.value = value;
-      selected.textContent = this.textContent;
-      customSelect.classList.remove('active');
-      // Déclencher l'événement change sur le select original
-      const event = new Event('change');
-      select.dispatchEvent(event);
+      customSelect.classList.toggle('active');
+      
+      // Mettre à jour la visibilité des options
+      const currentValue = select.value;
+      options.forEach(option => {
+        if (option.getAttribute('data-value') === currentValue) {
+          option.style.display = 'none';
+        } else {
+          option.style.display = 'block';
+        }
+      });
     });
-  });
+
+    options.forEach(option => {
+      option.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const value = this.getAttribute('data-value');
+        select.value = value;
+        selected.textContent = this.textContent;
+        customSelect.classList.remove('active');
+        // Déclencher l'événement change sur le select original
+        const event = new Event('change');
+        select.dispatchEvent(event);
+      });
+    });
+  }
 
   // Fermer le menu si on clique en dehors
   document.addEventListener('click', function(e) {
-    if (!customSelect.contains(e.target)) {
+    if (customSelect && !customSelect.contains(e.target)) {
       customSelect.classList.remove('active');
     }
   });
-});
 
-// Gestion du panneau de réglages
-settingsToggle.addEventListener('click', () => {
-  settingsToggle.classList.toggle('active');
-  settingsContent.classList.toggle('active');
-});
+  // Gestion du panneau de réglages
+  if (settingsToggle && settingsContent) {
+    settingsToggle.addEventListener('click', () => {
+      settingsToggle.classList.toggle('active');
+      settingsContent.classList.toggle('active');
+    });
+  }
 
-// Mettre à jour les valeurs du slider de flou radial
-radialBlurSlider.min = "0";
-radialBlurSlider.max = "5";
-radialBlurSlider.step = "0.1";
-radialBlurSlider.value = "0";
+  // Mettre à jour les valeurs du slider de flou radial
+  if (radialBlurSlider) {
+    radialBlurSlider.min = "0";
+    radialBlurSlider.max = "5";
+    radialBlurSlider.step = "0.1";
+    radialBlurSlider.value = "0";
+  }
 
-// Ajouter un gestionnaire pour le changement d'orientation
-window.addEventListener('orientationchange', () => {
-  setTimeout(() => {
-    // Forcer un rendu complet après le changement d'orientation
-    applyPreviewEffects(true);
-  }, 300);
+  // Ajouter un gestionnaire pour le changement d'orientation
+  window.addEventListener('orientationchange', () => {
+    setTimeout(() => {
+      // Forcer un rendu complet après le changement d'orientation
+      applyPreviewEffects(true);
+    }, 300);
+  });
 });
