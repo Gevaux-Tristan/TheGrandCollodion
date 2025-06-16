@@ -234,40 +234,56 @@ function loadImage(file) {
     reader.onload = function(e) {
         const img = new Image();
         img.onload = function() {
+            // Create a temporary canvas for initial processing
             const tempCanvas = document.createElement('canvas');
-            const tempCtx = tempCanvas.getContext('2d');
+            const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+            
+            // Calculate dimensions with a more efficient approach
+            const DOWNSAMPLE_PIXEL_RATIO_CAP = 1.5;
+            const effectivePixelRatio = Math.min(window.devicePixelRatio || 1, DOWNSAMPLE_PIXEL_RATIO_CAP);
+            const MAX_DIMENSION = (window.innerWidth <= 900 ? 2048 : 3072) * effectivePixelRatio;
             
             let newWidth = img.width;
             let newHeight = img.height;
             
-            const DOWNSAMPLE_PIXEL_RATIO_CAP = 1.5; // Cap pixel ratio to manage canvas size
-            const effectivePixelRatio = Math.min(window.devicePixelRatio || 1, DOWNSAMPLE_PIXEL_RATIO_CAP);
-            const MAX_DIMENSION = (window.innerWidth <= 900 ? 2048 : 3072) * effectivePixelRatio;
-            
             if (img.width > MAX_DIMENSION || img.height > MAX_DIMENSION) {
-                if (img.width > img.height) {
-                    newWidth = MAX_DIMENSION;
-                    newHeight = (img.height * MAX_DIMENSION) / img.width;
-                } else {
-                    newHeight = MAX_DIMENSION;
-                    newWidth = (img.width * MAX_DIMENSION) / img.height;
-                }
+                const scale = MAX_DIMENSION / Math.max(img.width, img.height);
+                newWidth = Math.floor(img.width * scale);
+                newHeight = Math.floor(img.height * scale);
             }
             
+            // Set canvas dimensions
             tempCanvas.width = newWidth;
             tempCanvas.height = newHeight;
+            
+            // Optimize drawing settings
+            tempCtx.imageSmoothingEnabled = true;
+            tempCtx.imageSmoothingQuality = 'high';
+            
+            // Draw image with optimized settings
             tempCtx.drawImage(img, 0, 0, newWidth, newHeight);
             
+            // Create the final image with optimized settings
             originalImage = new Image();
             originalImage.onload = function() {
                 document.getElementById('preview-container').classList.add('has-image');
                 cachedImageData = null;
                 applyPreviewEffects(true);
             };
-            originalImage.src = tempCanvas.toDataURL('image/jpeg', 1.0);
+            
+            // Use a more efficient quality setting for JPEG
+            originalImage.src = tempCanvas.toDataURL('image/jpeg', 0.92);
+            
+            // Clean up
+            tempCanvas.remove();
         };
+        
+        // Optimize image loading
+        img.crossOrigin = 'anonymous';
         img.src = e.target.result;
     };
+    
+    // Optimize file reading
     reader.readAsDataURL(file);
 }
 
@@ -448,22 +464,34 @@ function applyPreviewEffects(forceFullQuality = false) {
 
     isProcessing = true;
 
+    // Optimize canvas creation and context settings
     if (!cachedImageData) {
         previewCanvas.width = originalImage.width;
         previewCanvas.height = originalImage.height;
+        
+        // Optimize drawing settings
+        previewCtx.imageSmoothingEnabled = true;
+        previewCtx.imageSmoothingQuality = 'high';
+        
+        // Draw image with optimized settings
         previewCtx.drawImage(originalImage, 0, 0);
+        
+        // Get image data once and cache it
         cachedImageData = previewCtx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
         
+        // Optimize grayscale conversion
         const data = cachedImageData.data;
-        for (let i = 0; i < data.length; i += 4) {
+        const len = data.length;
+        for (let i = 0; i < len; i += 4) {
             const avg = (data[i] + data[i+1] + data[i+2]) / 3;
             data[i] = data[i+1] = data[i+2] = avg;
         }
     }
 
     const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     
+    // Set canvas dimensions
     canvas.width = originalImage.width;
     canvas.height = originalImage.height;
 
