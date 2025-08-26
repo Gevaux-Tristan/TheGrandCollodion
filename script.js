@@ -387,7 +387,7 @@ function applyEffects(ctx, canvasWidth, canvasHeight, settings, isLowRes = false
 
         // 1) Create blurred version of the current image
         blurCtx.drawImage(workingCanvasForEffects, 0, 0);
-        const blurAmount = radialBlur * (isLowRes ? 0.5 : 1);
+        const blurAmount = radialBlur * (isLowRes ? 1.5 : 3);
         blurCtx.filter = `blur(${blurAmount}px)`;
         blurCtx.drawImage(blurCanvas, 0, 0);
         blurCtx.filter = 'none';
@@ -403,8 +403,8 @@ function applyEffects(ctx, canvasWidth, canvasHeight, settings, isLowRes = false
         const maskGradient = maskCtx.createRadialGradient(centerX, centerY, 0, centerX, centerY, maxRadius);
         // Smooth transition: no blur at center, increasing to full blur at edges
         maskGradient.addColorStop(0.0, 'rgba(0,0,0,0)');
-        maskGradient.addColorStop(0.4, 'rgba(0,0,0,0.3)');
-        maskGradient.addColorStop(0.8, 'rgba(0,0,0,0.7)');
+        maskGradient.addColorStop(0.35, 'rgba(0,0,0,0.6)');
+        maskGradient.addColorStop(0.7, 'rgba(0,0,0,0.85)');
         maskGradient.addColorStop(1.0, 'rgba(0,0,0,1)');
         maskCtx.fillStyle = maskGradient;
         maskCtx.fillRect(0, 0, sourceWidth, sourceHeight);
