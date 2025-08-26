@@ -378,48 +378,46 @@ function applyEffects(ctx, canvasWidth, canvasHeight, settings, isLowRes = false
 
     workingCtxForEffects.putImageData(imageDataForProcessing, 0, 0);
 
-    // Apply Radial Blur if needed
+    // Apply Radial Blur if needed (exposure-neutral)
     if (radialBlur > 0) {
         const blurCanvas = document.createElement('canvas');
         blurCanvas.width = sourceWidth;
         blurCanvas.height = sourceHeight;
         const blurCtx = blurCanvas.getContext('2d');
-        
-        // Draw the current state to the blur canvas
+
+        // 1) Create blurred version of the current image
         blurCtx.drawImage(workingCanvasForEffects, 0, 0);
-        
-        // Create a radial gradient for the blur effect
-        const centerX = sourceWidth / 2;
-        const centerY = sourceHeight / 2;
-        const maxRadius = Math.sqrt(centerX * centerX + centerY * centerY);
-        
-        // Calculate blur amount based on distance from center
         const blurAmount = radialBlur * (isLowRes ? 0.5 : 1);
-        
-        // Create a radial gradient for the blur mask
-        const gradient = blurCtx.createRadialGradient(
-            centerX, centerY, 0,
-            centerX, centerY, maxRadius
-        );
-        
-        // Add color stops for smooth transition with white instead of black
-        gradient.addColorStop(0, 'rgba(255, 255, 255, 0)');
-        gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.1)');
-        gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.3)');
-        gradient.addColorStop(1, 'rgba(255, 255, 255, 0.5)');
-        
-        // Apply the blur effect with screen composite operation
-        blurCtx.globalCompositeOperation = 'screen';
-        blurCtx.fillStyle = gradient;
-        blurCtx.fillRect(0, 0, sourceWidth, sourceHeight);
-        
-        // Apply Gaussian blur
         blurCtx.filter = `blur(${blurAmount}px)`;
         blurCtx.drawImage(blurCanvas, 0, 0);
         blurCtx.filter = 'none';
-        
-        // Draw the blurred result back to the working canvas
+
+        // 2) Build an alpha mask that is 0 at center and 1 at edges
+        const maskCanvas = document.createElement('canvas');
+        maskCanvas.width = sourceWidth;
+        maskCanvas.height = sourceHeight;
+        const maskCtx = maskCanvas.getContext('2d');
+        const centerX = sourceWidth / 2;
+        const centerY = sourceHeight / 2;
+        const maxRadius = Math.sqrt(centerX * centerX + centerY * centerY);
+        const maskGradient = maskCtx.createRadialGradient(centerX, centerY, 0, centerX, centerY, maxRadius);
+        // Smooth transition: no blur at center, increasing to full blur at edges
+        maskGradient.addColorStop(0.0, 'rgba(0,0,0,0)');
+        maskGradient.addColorStop(0.4, 'rgba(0,0,0,0.3)');
+        maskGradient.addColorStop(0.8, 'rgba(0,0,0,0.7)');
+        maskGradient.addColorStop(1.0, 'rgba(0,0,0,1)');
+        maskCtx.fillStyle = maskGradient;
+        maskCtx.fillRect(0, 0, sourceWidth, sourceHeight);
+
+        // 3) Apply mask to blurred image (destination-in keeps only masked parts)
+        blurCtx.globalCompositeOperation = 'destination-in';
+        blurCtx.drawImage(maskCanvas, 0, 0);
+        blurCtx.globalCompositeOperation = 'source-over';
+
+        // 4) Composite masked blur over original image to replace pixels (no brightening)
         workingCtxForEffects.drawImage(blurCanvas, 0, 0);
+
+        maskCanvas.remove();
         blurCanvas.remove();
     }
 
