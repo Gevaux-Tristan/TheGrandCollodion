@@ -5,45 +5,41 @@
 }
 
 html, body {
-  margin: 0;
-  padding: 0;
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
-  position: relative;
 }
 
 body {
   font-family: 'DM Sans', sans-serif;
   background-color: #0F0F0F;
-  color: white;
-  display: flex;
+  color: #fff;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
-  width: 100%;
-  max-width: 100%;
 }
 
 #main-container {
   display: flex;
   width: 100%;
-  max-width: 100%;
-  overflow-x: hidden;
-  position: relative;
-  padding-bottom: 0;
-  min-height: 100vh;
+  height: 100%;
 }
+
+/* ===== Preview ===== */
 
 #preview-container {
   position: relative;
-  width: 100%;
+  flex: 1;
   height: 100%;
   background-color: #1a1a1a;
   display: flex;
   justify-content: center;
   align-items: center;
   overflow: hidden;
-  max-width: 100%;
+}
+
+#preview-container:not(.has-image) {
+  cursor: pointer;
 }
 
 #canvas {
@@ -54,8 +50,57 @@ body {
   object-fit: contain;
 }
 
+#drag-message {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: #8a8a8a;
+  pointer-events: none;
+  transition: all 0.3s ease;
+  padding: 80px;
+  border: 2px dashed #555;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+#drag-message .material-icon {
+  font-size: 30px;
+  display: block;
+  margin-bottom: -8px;
+  transition: all 0.3s ease;
+}
+
+#drag-message p {
+  font-size: 16px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+#preview-container.drag-over #drag-message {
+  transform: translate(-50%, -50%) scale(1.05);
+  border-color: #FFBF00;
+  color: #FFBF00;
+  background-color: rgba(255, 191, 0, 0.04);
+}
+
+#preview-container.drag-over #drag-message .material-icon {
+  transform: translateY(-8px);
+}
+
+#preview-container.has-image #drag-message {
+  opacity: 0;
+}
+
+/* ===== Controls panel ===== */
+
 #controls-panel {
-  width: calc(380px + 65px);
+  width: 380px;
+  flex: 0 0 380px;
   padding: 32px 24px;
   background-color: #0F0F0F;
   border-left: 1px solid #FFBF00;
@@ -63,196 +108,29 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 30px;
-  box-sizing: border-box;
-  max-width: 100%;
-  height: auto;
-  min-height: 100vh;
+  overflow-y: auto;
 }
 
 #logo {
   width: 200px;
-  margin-bottom: 20px;
   max-width: 100%;
+  display: block;
+  margin: 0 auto 8px;
 }
 
-.upload-label {
-  width: 100%;
-  max-width: 100%;
-  background-color: #FFBF00;
-  color: #0F0F0F;
-  padding: 12px;
-  text-align: center;
-  font-weight: bold;
-  cursor: pointer;
-  border-radius: 4px;
-}
-
-.upload-label input {
-  display: none;
-}
-
+/* Hidden by default (mobile-only elements) */
+#sheet-handle,
+#sheet-scrim,
+#texture-chips,
 .mobile-only {
   display: none;
 }
 
-.control {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  box-sizing: border-box;
-  padding: 0;
-}
+/* ===== Buttons ===== */
 
-.control label {
-  font-size: 13px;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-input[type="range"] {
-  width: 100%;
-  -webkit-appearance: none;
-  height: 6px;
-  background: #333;
-  border-radius: 5px;
-  outline: none;
-  box-sizing: border-box;
-  pointer-events: none;
-}
-
-input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 24px;
-  height: 24px;
-  background: #FFBF00;
-  border-radius: 50%;
-  cursor: pointer;
-  pointer-events: auto;
-  border: 2px solid #0F0F0F;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
-}
-
-/* Style pour Firefox */
-input[type="range"]::-moz-range-thumb {
-  width: 24px;
-  height: 24px;
-  background: #FFBF00;
-  border-radius: 50%;
-  cursor: pointer;
-  pointer-events: auto;
-  border: 2px solid #0F0F0F;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
-}
-
-/* Style pour Edge */
-input[type="range"]::-ms-thumb {
-  width: 24px;
-  height: 24px;
-  background: #FFBF00;
-  border-radius: 50%;
-  cursor: pointer;
-  pointer-events: auto;
-  border: 2px solid #0F0F0F;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
-}
-
-/* Désactive les interactions sur la piste pour tous les navigateurs */
-input[type="range"]::-moz-range-track {
-  pointer-events: none;
-}
-
-input[type="range"]::-ms-track {
-  pointer-events: none;
-}
-
-/* Style du select */
-#controls-panel select {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  width: 100% !important;
-  padding: 12px 40px 12px 12px !important;
-  font-size: 15px !important;
-  font-weight: bold !important;
-  color: #FFBF00 !important;
-  background-color: #0F0F0F !important;
-  border: 2px solid #FFBF00 !important;
-  border-radius: 4px !important;
-  cursor: pointer !important;
-  background-image: url('data:image/svg+xml;utf8,<svg fill="%23FFBF00" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>') !important;
-  background-repeat: no-repeat !important;
-  background-position: right 12px center !important;
-  background-size: 20px !important;
-  transition: all 0.2s ease-in-out !important;
-}
-
-#controls-panel select:hover {
-  border-color: #e6ac00 !important;
-  color: #e6ac00 !important;
-}
-
-#controls-panel select:focus {
-  outline: none !important;
-  border-color: #FFBF00 !important;
-  box-shadow: 0 0 0 2px rgba(255, 191, 0, 0.3) !important;
-}
-
-/* Style du menu déroulant */
-#controls-panel select::-ms-expand {
-  display: none !important;
-}
-
-#controls-panel select option {
-  background-color: #0F0F0F !important;
-  color: #FFBF00 !important;
-  padding: 12px !important;
-  font-size: 15px !important;
-  font-weight: bold !important;
-  border: none !important;
-  border-bottom: 1px solid #FFBF00 !important;
-}
-
-#controls-panel select option:last-child {
-  border-bottom: none !important;
-}
-
-#controls-panel select option:hover {
-  background-color: #1a1a1a !important;
-}
-
-#controls-panel select option:checked {
-  background-color: #FFBF00 !important;
-  color: #0F0F0F !important;
-}
-
-/* Style pour Firefox */
-@-moz-document url-prefix() {
-  #controls-panel select {
-    color-scheme: dark !important;
-  }
-  
-  #controls-panel select option {
-    background-color: #0F0F0F !important;
-    color: #FFBF00 !important;
-  }
-}
-
-/* Style pour Chrome/Safari */
-@media screen and (-webkit-min-device-pixel-ratio:0) {
-  #controls-panel select {
-    color-scheme: dark !important;
-  }
-  
-  #controls-panel select option {
-    background-color: #0F0F0F !important;
-    color: #FFBF00 !important;
-  }
-}
-
-/* Supprimer les styles en conflit */
 .upload-label, #download {
   width: 100%;
+  min-height: 48px;
   font-size: 15px;
   padding: 12px;
   font-weight: bold;
@@ -262,10 +140,10 @@ input[type="range"]::-ms-track {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  box-sizing: border-box;
 }
 
 .upload-label {
+  position: relative;
   background-color: #FFBF00;
   color: #0F0F0F;
   border: none;
@@ -276,14 +154,26 @@ input[type="range"]::-ms-track {
   background-color: #e6ac00;
 }
 
+.upload-label:focus-within {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+/* Keep the file input focusable for keyboard users, but invisible */
+.upload-label input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
 #download {
   background-color: transparent;
   color: #FFBF00;
   border: 2px solid #FFBF00;
   transition: all 0.2s ease-in-out;
-  margin: 0 0 34px 0 !important;
-  width: 100%;
-  box-sizing: border-box;
 }
 
 #download .material-icon {
@@ -300,88 +190,6 @@ input[type="range"]::-ms-track {
   color: #0F0F0F;
 }
 
-#controls-panel {
-  width: 380px;
-  padding: 32px 24px;
-  background-color: #0F0F0F;
-  border-left: 1px solid #FFBF00;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 30px;
-}
-
-#logo {
-  width: 200px;
-  margin: 0 auto;
-  display: block;
-}
-
-.control {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-}
-
-.control label {
-  font-size: 13px;
-}
-
-.upload-label, #download {
-  font-size: 15px;
-}
-
-select {
-  font-size: 15px;
-}
-
-#download:hover, .upload-label:hover {
-  opacity: 1;
-  background-color: #e6ac00;
-  transform: none;
-}
-
-#download {
-  width: 100%;
-}
-
-
-/* Ligne jaune sous le logo */
-#logo {
-  width: 200px;
-  margin-bottom: 8px;
-}
-#logo::after {
-  content: "";
-  display: block;
-  width: 100%;
-  height: 2px;
-  background-color: #FFBF00;
-  margin-top: 12px;
-}
-
-/* Upload en full width */
-.upload-label {
-  width: 100%;
-}
-
-/* Style dropdown jaune + chevron */
-select {
-  font-size: 15px;
-  color: #FFBF00;
-  background: #111;
-  padding: 8px;
-  border-radius: 4px;
-  border: 1px solid #FFBF00;
-  appearance: none;
-  background-image: url('data:image/svg+xml;utf8,<svg fill="%23FFBF00" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
-  background-repeat: no-repeat;
-  background-position-x: calc(100% - 10px);
-  background-position-y: center;
-}
-
-/* Icônes dans les boutons */
 .material-icon {
   font-family: 'Material Icons';
   font-style: normal;
@@ -391,181 +199,70 @@ select {
   margin-right: 6px;
 }
 
+#drag-message .material-icon {
+  margin-right: 0;
+}
 
-/* Boutons harmonisés */
-.upload-label, #download {
+/* ===== Sliders ===== */
+
+.control {
   width: 100%;
-  font-size: 15px;
-  padding: 12px;
-  font-weight: bold;
-  border-radius: 4px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.upload-label {
-  background-color: #FFBF00;
-  color: #0F0F0F;
-  border: none;
-  transition: background-color 0.2s ease-in-out;
-}
-
-.upload-label:hover {
-  background-color: #e6ac00;
-}
-
-/* Dropdown stylisé */
-select {
-  font-size: 15px;
-  color: #FFBF00;
-  background: #111;
-  padding: 8px 32px 8px 10px;
-  border-radius: 4px;
-  border: 1px solid #FFBF00;
-  appearance: none;
-  background-image: url('data:image/svg+xml;utf8,<svg fill="%23FFBF00" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
-  background-repeat: no-repeat;
-  background-position-x: calc(100% - 10px);
-  background-position-y: center;
-}
-
-/* Option styling (partial, browser-dependent) */
-select option {
-  background-color: #0F0F0F;
-  color: #FFBF00;
-  border-bottom: 1px solid #333;
-}
-
-
-/* Forcer la même largeur exacte pour les deux boutons */
-.upload-label, #download {
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-/* Stylisation avancée du menu déroulant ouvert */
-select {
-  font-size: 15px;
-  color: #FFBF00;
-  background-color: #0F0F0F;
-  border: 1px solid #FFBF00;
-  border-radius: 4px;
-  padding: 8px 32px 8px 10px;
-  appearance: none;
-  background-image: url('data:image/svg+xml;utf8,<svg fill="%23FFBF00" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
-  background-repeat: no-repeat;
-  background-position-x: calc(100% - 10px);
-  background-position-y: center;
-}
-
-select:focus {
-  outline: none;
-  border-color: #FFBF00;
-  box-shadow: 0 0 0 2px rgba(255, 191, 0, 0.3);
-}
-
-/* Les options dans le dropdown */
-select option {
-  background-color: #0F0F0F;
-  color: #FFBF00;
-  border-bottom: 1px solid #333;
-}
-
-@keyframes pulse {
-  0% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 0.8;
-  }
-  50% {
-    transform: translate(-50%, -50%) scale(1.02);
-    opacity: 1;
-  }
-  100% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 0.8;
-  }
-}
-
-@keyframes iconFloat {
-  0% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-5px);
-  }
-  100% {
-    transform: translateY(0);
-  }
-}
-
-#drag-message {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  color: #444444;
-  pointer-events: none;
-  transition: all 0.3s ease;
-  padding: 80px;
-  border: 2px dashed #444444;
-  border-radius: 6px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  border-style: dashed;
-  border-width: 2px;
-  border-spacing: 20px;
+  gap: 6px;
 }
 
-#drag-message .material-icon {
-  font-size: 30px;
-  display: block;
-  color: #444444;
-  margin-bottom: -8px;
-  transition: all 0.3s ease;
+.control label {
+  font-size: 13px;
 }
 
-#drag-message p {
-  font-size: 16px;
-  margin: 0;
-  font-family: 'DM Sans', sans-serif;
-  color: #444444;
-  font-weight: 500;
-  transition: all 0.3s ease;
+input[type="range"] {
+  width: 100%;
+  -webkit-appearance: none;
+  height: 6px;
+  background: #333;
+  border-radius: 5px;
+  outline: none;
+  pointer-events: none;
 }
 
-#preview-container.drag-over #drag-message {
-  transform: translate(-50%, -50%) scale(1.05);
-  border-color: #666666;
-  background-color: rgba(68, 68, 68, 0.05);
+input[type="range"]:focus-visible {
+  outline: 2px solid #FFBF00;
+  outline-offset: 6px;
 }
 
-#preview-container.drag-over #drag-message .material-icon {
-  transform: translateY(-8px);
-  color: #666666;
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 24px;
+  height: 24px;
+  background: #FFBF00;
+  border-radius: 50%;
+  cursor: pointer;
+  pointer-events: auto;
+  border: 2px solid #0F0F0F;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
 }
 
-#preview-container.drag-over #drag-message p {
-  color: #666666;
-  transform: translateY(-4px);
+input[type="range"]::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  background: #FFBF00;
+  border-radius: 50%;
+  cursor: pointer;
+  pointer-events: auto;
+  border: 2px solid #0F0F0F;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
 }
 
-#preview-container.has-image #drag-message {
-  opacity: 0;
+input[type="range"]::-moz-range-track {
+  pointer-events: none;
 }
 
-/* Style du menu déroulant personnalisé */
+/* ===== Texture select (desktop dropdown) ===== */
+
 .custom-select {
   width: 100%;
   position: relative;
-  box-sizing: border-box;
-  padding: 0;
 }
 
 .custom-select select {
@@ -589,7 +286,7 @@ select option {
 
 .custom-select .selected {
   width: 100%;
-  padding: 12px;
+  padding: 12px 32px 12px 12px;
   font-size: 13px;
   font-weight: 300;
   color: #FFBF00;
@@ -598,10 +295,6 @@ select option {
   border-radius: 4px;
   cursor: pointer;
   text-align: left;
-  position: relative;
-  padding-right: 32px;
-  box-sizing: border-box;
-  margin: 0;
 }
 
 .select-options {
@@ -615,10 +308,9 @@ select option {
   border: 1px solid #FFBF00;
   border-top: none;
   border-radius: 0 0 4px 4px;
-  z-index: 1000;
+  z-index: 100;
   max-height: 200px;
   overflow-y: auto;
-  box-sizing: border-box;
 }
 
 .select-options::-webkit-scrollbar {
@@ -643,7 +335,6 @@ select option {
   font-weight: 300;
   font-size: 13px;
   border-bottom: 1px solid #FFBF00;
-  box-sizing: border-box;
 }
 
 .option:last-child {
@@ -655,151 +346,242 @@ select option {
   color: #0F0F0F;
 }
 
+/* ===== Desktop: flatten wrappers to keep the historical panel order ===== */
+
 @media (min-width: 901px) {
-  #download {
-    margin: 0 0 80px 0 !important;
-  }
-}
-
-@media (max-width: 900px) {
-  #main-container {
-    flex-direction: column;
-    height: 100vh;
-    overflow: hidden;
+  #sheet-sliders,
+  #sheet-more,
+  #sheet-actions {
+    display: contents;
   }
 
-  #preview-container {
-    flex: 1;
-    height: 70vh;
-    min-height: 70vh;
-    max-height: 70vh;
-  }
-
-  #controls-panel {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    width: 100%;
-    height: 30vh;
-    min-height: 30vh;
-    max-height: 30vh;
-    padding: 16px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    border-left: none;
-    border-top: 1px solid #FFBF00;
-    z-index: 1000;
-  }
-
-  /* Ajout d'un effet de dégradé en bas du panneau pour indiquer qu'il y a plus de contenu */
-  #controls-panel::after {
-    content: '';
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 30px;
-    background: linear-gradient(to bottom, transparent, #0F0F0F);
-    pointer-events: none;
-  }
-
-  .control {
-    gap: 10px;
-    margin-bottom: 10px;
-  }
-
-  /* Increase button sizes for mobile */
-  .upload-label, #download {
-    padding: 16px;
-    font-size: 16px;
-    min-height: 54px;
-  }
-
-  .upload-label .material-icon, #download .material-icon {
-    font-size: 24px;
-  }
-
-  .custom-select .selected, .option {
-    padding: 16px;
-    font-size: 16px;
-    min-height: 54px;
-  }
-
-  #drag-message {
+  /* Beats the .upload-label display rule, which would otherwise resurface it */
+  .upload-label.mobile-only {
     display: none;
   }
 
-  #download {
-    margin-top: 10px;
-    margin-bottom: 80px;
-  }
+  #logo { order: 0; }
+  #sheet-actions .upload-label { order: 1; }
+  #sheet-sliders .control { order: 2; }
+  #texture-control { order: 3; }
+  #download { order: 4; margin-bottom: 50px; }
 }
 
-@media (max-width: 600px) {
+/* ===== Mobile: bottom sheet ===== */
+
+@media (max-width: 900px) {
+  .mobile-only { display: block; }
+  .desktop-only { display: none; }
+  #logo { display: none; }
+
   #main-container {
-    padding-bottom: 0;
+    display: block;
   }
 
   #preview-container {
-    height: 90vh;
-    min-height: 450px;
+    height: calc(100vh - var(--sheet-peek, 236px));
+    height: calc(100dvh - var(--sheet-peek, 236px));
   }
 
+  #drag-message {
+    padding: 36px 28px;
+  }
+
+  /* Scrim behind the expanded sheet */
+  #sheet-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+    z-index: 900;
+  }
+
+  #sheet-scrim.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* The panel becomes the sheet */
   #controls-panel {
-    padding: 20px;
-    gap: 25px;
-    height: auto;
-    min-height: auto;
-    padding-bottom: 50px;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    flex: none;
+    max-height: calc(100dvh - 24px);
+    padding: 0 20px;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    border-left: none;
+    border-top: 1px solid #FFBF00;
+    border-radius: 16px 16px 0 0;
+    gap: 0;
+    align-items: stretch;
+    overflow: hidden;
+    z-index: 1000;
+    transform: translateY(calc(100% - var(--sheet-peek, 236px)));
+    transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
-  .control {
-    gap: 8px;
-    margin-bottom: 12px;
+  #controls-panel.expanded {
+    transform: translateY(0);
+    overflow-y: auto;
   }
 
-  /* Even larger buttons for smaller screens */
-  .upload-label, #download {
-    padding: 18px;
-    font-size: 18px;
-    min-height: 60px;
+  #controls-panel.dragging {
+    transition: none;
   }
 
-  .upload-label .material-icon, #download .material-icon {
-    font-size: 28px;
+  /* Drag handle */
+  #sheet-handle {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex: none;
+    background: none;
+    border: none;
+    padding: 14px 0 12px;
+    margin: 0 -20px;
+    cursor: grab;
+    touch-action: none;
   }
 
-  .custom-select .selected, .option {
-    padding: 18px;
-    font-size: 18px;
-    min-height: 60px;
+  #sheet-handle .grabber {
+    width: 44px;
+    height: 5px;
+    border-radius: 3px;
+    background: #4a4a4a;
+    transition: background 0.2s ease-out;
   }
 
-  #logo {
-    width: 80%;
-    max-width: 80%;
+  #sheet-handle:active .grabber,
+  #controls-panel.expanded .grabber {
+    background: #FFBF00;
+  }
+
+  /* Always-visible sliders, 2x2. Bottom padding doubles as the collapsed
+     sheet's safe-area spacing, since the sheet's own bottom edge sits
+     off-screen while collapsed. */
+  #sheet-sliders {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 24px;
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+  }
+
+  #sheet-sliders .control {
+    gap: 9px;
   }
 
   .control label {
-    font-size: 16px;
+    font-size: 12px;
+    color: #bfbfbf;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    width: 26px;
+    height: 26px;
+  }
+
+  input[type="range"]::-moz-range-thumb {
+    width: 26px;
+    height: 26px;
+  }
+
+  /* Expandable section */
+  #sheet-more {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding-top: 6px;
+  }
+
+  /* Texture picker: swipeable thumbnails instead of dropdown */
+  #texture-control .custom-select {
+    display: none;
+  }
+
+  #texture-chips {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    padding: 2px 20px 6px;
+    margin: 0 -20px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  #texture-chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .texture-chip {
+    flex: 0 0 auto;
+    width: 60px;
+    height: 60px;
+    padding: 0;
+    border-radius: 8px;
+    border: 2px solid #3a3a3a;
+    background-color: #1a1a1a;
+    background-size: cover;
+    background-position: center;
+    position: relative;
+    cursor: pointer;
+    scroll-snap-align: center;
+  }
+
+  .texture-chip span {
+    position: absolute;
+    bottom: 3px;
+    right: 5px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  }
+
+  .texture-chip[aria-pressed="true"] {
+    border-color: #FFBF00;
+    box-shadow: 0 0 0 1px #FFBF00;
+  }
+
+  /* Upload / camera side by side */
+  #sheet-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  #sheet-actions .upload-label {
+    font-size: 14px;
+    padding: 12px 8px;
   }
 
   #download {
-    margin-top: 12px;
-    margin-bottom: 100px;
+    margin: 0;
   }
 }
 
-@media (max-width: 768px) {
-  .mobile-only {
-    display: block;
+/* Short landscape phones: one row of sliders */
+@media (max-width: 900px) and (max-height: 500px) {
+  #sheet-sliders {
+    grid-template-columns: repeat(4, 1fr);
   }
-  
-  #controls-panel {
-    width: 100%;
-    padding: 16px;
-    border-left: none;
-    border-top: 1px solid #FFBF00;
+}
+
+/* ===== Reduced motion ===== */
+
+@media (prefers-reduced-motion: reduce) {
+  #controls-panel,
+  #sheet-scrim,
+  #sheet-handle .grabber,
+  #drag-message,
+  #drag-message .material-icon,
+  #drag-message p {
+    transition: none;
   }
 }

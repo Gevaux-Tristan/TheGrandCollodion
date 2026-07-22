@@ -116,6 +116,139 @@ function initializeApp() {
     setupSliders(elements);
     setupDownloadButton(elements.downloadButton, elements.canvas);
     setupTextureSelect(elements.textureSelect);
+    buildTextureChips(elements.textureSelect);
+    setupBottomSheet();
+    setupTapToUpload(elements.previewContainer, elements.imageInput);
+}
+
+// Tap anywhere on the empty preview to open the file picker
+function setupTapToUpload(previewContainer, imageInput) {
+    previewContainer.addEventListener('click', () => {
+        if (!originalImage) {
+            imageInput.click();
+        }
+    });
+}
+
+// Mobile texture picker: horizontal swipeable thumbnails mirroring the select
+function buildTextureChips(select) {
+    const container = document.getElementById('texture-chips');
+    if (!container) return;
+
+    Array.from(select.options).forEach(opt => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'texture-chip';
+        chip.dataset.value = opt.value;
+        chip.setAttribute('aria-pressed', String(opt.value === select.value));
+        chip.setAttribute('aria-label', opt.text);
+        chip.style.backgroundImage = `url("${opt.value}")`;
+        const num = document.createElement('span');
+        num.textContent = opt.text.replace('Collodion-', '');
+        chip.appendChild(num);
+        chip.addEventListener('click', () => {
+            select.value = opt.value;
+            select.dispatchEvent(new Event('change'));
+        });
+        container.appendChild(chip);
+    });
+
+    select.addEventListener('change', () => {
+        const selectedDiv = document.querySelector('.custom-select .selected');
+        if (selectedDiv) selectedDiv.textContent = select.options[select.selectedIndex].text;
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        container.querySelectorAll('.texture-chip').forEach(chip => {
+            const active = chip.dataset.value === select.value;
+            chip.setAttribute('aria-pressed', String(active));
+            if (active) {
+                chip.scrollIntoView({ block: 'nearest', inline: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
+            }
+        });
+    });
+}
+
+// Mobile bottom sheet: sliders always visible, drag up to reveal the rest
+function setupBottomSheet() {
+    const sheet = document.getElementById('controls-panel');
+    const handle = document.getElementById('sheet-handle');
+    const scrim = document.getElementById('sheet-scrim');
+    const slidersSection = document.getElementById('sheet-sliders');
+    const moreSection = document.getElementById('sheet-more');
+    if (!sheet || !handle || !scrim || !slidersSection || !moreSection) return;
+
+    const mq = window.matchMedia('(max-width: 900px)');
+    let expanded = false;
+
+    function peekHeight() {
+        return handle.offsetHeight + slidersSection.offsetHeight;
+    }
+
+    function measure() {
+        if (!mq.matches) {
+            document.documentElement.style.removeProperty('--sheet-peek');
+            moreSection.inert = false;
+            return;
+        }
+        document.documentElement.style.setProperty('--sheet-peek', peekHeight() + 'px');
+        moreSection.inert = !expanded;
+    }
+
+    function setExpanded(value) {
+        expanded = value;
+        sheet.classList.toggle('expanded', expanded);
+        scrim.classList.toggle('visible', expanded);
+        handle.setAttribute('aria-expanded', String(expanded));
+        moreSection.inert = mq.matches && !expanded;
+        if (!expanded) sheet.scrollTop = 0;
+    }
+
+    let dragging = false;
+    let startY = 0;
+    let startOffset = 0;
+    let currentOffset = 0;
+    let maxOffset = 0;
+
+    handle.addEventListener('pointerdown', (e) => {
+        if (!mq.matches) return;
+        dragging = true;
+        startY = e.clientY;
+        maxOffset = Math.max(0, sheet.offsetHeight - peekHeight());
+        startOffset = expanded ? 0 : maxOffset;
+        currentOffset = startOffset;
+        sheet.classList.add('dragging');
+        handle.setPointerCapture(e.pointerId);
+    });
+
+    handle.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        currentOffset = Math.min(maxOffset, Math.max(0, startOffset + (e.clientY - startY)));
+        sheet.style.transform = `translateY(${currentOffset}px)`;
+    });
+
+    function endDrag(e, cancelled) {
+        if (!dragging) return;
+        dragging = false;
+        sheet.classList.remove('dragging');
+        sheet.style.transform = '';
+        if (cancelled) {
+            setExpanded(expanded);
+        } else if (Math.abs(e.clientY - startY) < 6) {
+            setExpanded(!expanded); // treated as a tap
+        } else {
+            setExpanded(currentOffset < maxOffset / 2); // snap to nearest state
+        }
+    }
+
+    handle.addEventListener('pointerup', (e) => endDrag(e, false));
+    handle.addEventListener('pointercancel', (e) => endDrag(e, true));
+
+    scrim.addEventListener('click', () => setExpanded(false));
+
+    window.addEventListener('resize', debounce(measure, 150));
+    window.addEventListener('orientationchange', () => setTimeout(measure, 350));
+    if (mq.addEventListener) mq.addEventListener('change', measure);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
+    measure();
 }
 
 function setupDragAndDrop(previewContainer) {

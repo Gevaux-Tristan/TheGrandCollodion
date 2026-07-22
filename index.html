@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <title>The Grand Collodion</title>
   
   <!-- PWA Meta Tags -->
@@ -40,39 +40,40 @@
     <div id="preview-container">
       <canvas id="canvas"></canvas>
       <div id="drag-message">
-        <span class="material-icon">image</span>
-        <p>Drag & drop your image here</p>
+        <span class="material-icon">add_photo_alternate</span>
+        <p class="desktop-only">Drag &amp; drop or click to add your image</p>
+        <p class="mobile-only">Tap to add your photo</p>
       </div>
     </div>
+    <div id="sheet-scrim"></div>
     <div id="controls-panel">
+      <button id="sheet-handle" type="button" aria-expanded="false" aria-controls="sheet-more" aria-label="More settings">
+        <span class="grabber" aria-hidden="true"></span>
+      </button>
       <!-- LOGO SVG INLINE -->
       <img src="logo.svg" alt="The Grand Collodion Logo" id="logo" />
-      <label class="upload-label">
-        <input type="file" id="upload" accept="image/*" />
-        <span class="material-icon">upload</span>Upload your image
-      </label>
-      <label class="upload-label mobile-only">
-        <input type="file" id="camera" accept="image/*" capture="environment" />
-        <span class="material-icon">camera_alt</span>Take a photo
-      </label>
-      <div class="control">
-        <label for="contrast">Contrast</label>
-        <input type="range" id="contrast" min="0" max="5" step="0.1" value="2.4" />
+      <div id="sheet-sliders">
+        <div class="control">
+          <label for="contrast">Contrast</label>
+          <input type="range" id="contrast" min="0" max="5" step="0.1" value="2.4" />
+        </div>
+        <div class="control">
+          <label for="opacity">Texture opacity</label>
+          <input type="range" id="opacity" min="0" max="1" step="0.01" value="0.55" />
+        </div>
+        <div class="control">
+          <label for="exposure">Exposure</label>
+          <input type="range" id="exposure" min="-2" max="2" step="0.1" value="0" />
+        </div>
+        <div class="control">
+          <label for="radialBlur">Radial Blur</label>
+          <input type="range" id="radialBlur" min="0" max="5" step="0.1" value="0" />
+        </div>
       </div>
-      <div class="control">
-        <label for="opacity">Texture opacity</label>
-        <input type="range" id="opacity" min="0" max="1" step="0.01" value="0.55" />
-      </div>
-      <div class="control">
-        <label for="exposure">Exposure</label>
-        <input type="range" id="exposure" min="-2" max="2" step="0.1" value="0" />
-      </div>
-      <div class="control">
-        <label for="radialBlur">Radial Blur</label>
-        <input type="range" id="radialBlur" min="0" max="5" step="0.1" value="0" />
-      </div>
-      <div class="control">
+      <div id="sheet-more">
+      <div class="control" id="texture-control">
         <label for="texture">Choose your texture :</label>
+        <div id="texture-chips" aria-label="Textures"></div>
         <div class="custom-select">
           <select id="texture">
             <option value="Collodion-01.png" selected>Collodion-01</option>
@@ -124,7 +125,18 @@
           </div>
         </div>
       </div>
+      <div id="sheet-actions">
+        <label class="upload-label">
+          <input type="file" id="upload" accept="image/*" />
+          <span class="material-icon">upload</span>Upload your image
+        </label>
+        <label class="upload-label mobile-only">
+          <input type="file" id="camera" accept="image/*" capture="environment" />
+          <span class="material-icon">camera_alt</span>Take a photo
+        </label>
+      </div>
       <button id="download"><span class="material-icon">save</span>Download your collodion</button>
+      </div>
     </div>
   </div>
   <script src="script.js"></script>
