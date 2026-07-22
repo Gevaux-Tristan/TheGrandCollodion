@@ -62,16 +62,6 @@ async function loadOptimizedTexture(src) {
     });
 }
 
-const contrastSlider = document.getElementById("contrast");
-const opacitySlider = document.getElementById("opacity");
-const exposureSlider = document.getElementById("exposure");
-const radialBlurSlider = document.getElementById("radialBlur");
-const textureSelect = document.getElementById("texture");
-const customSelect = document.querySelector('.custom-select');
-const selectOptions = document.querySelector('.select-options');
-const settingsToggle = document.querySelector('.settings-toggle');
-const settingsContent = document.querySelector('.settings-content');
-
 // Attendre que le DOM soit complètement chargé
 document.addEventListener('DOMContentLoaded', initializeApp);
 
@@ -459,8 +449,6 @@ function applyRadialBlur(targetCtx, width, height, intensity, isPreviewBlur = fa
     tempCopyCanvas.remove();
 }
 
-const DEFAULT_GRAIN_AMOUNT = 0.05; // Light, fixed grain amount
-
 function applyEffects(ctx, canvasWidth, canvasHeight, settings, isLowRes = false) {
     const { contrast, exposure, radialBlur, opacity, texture, imageData: baseGrayscaleImageData } = settings;
 
@@ -644,19 +632,6 @@ function applyPreviewEffects(forceFullQuality = false) {
     }
 }
 
-// Update select options visibility when opening the dropdown
-customSelect.addEventListener('click', function() {
-  const selectedValue = textureSelect.value;
-  const options = selectOptions.querySelectorAll('.option');
-  options.forEach(option => {
-    if (option.dataset.value === selectedValue) {
-      option.style.display = 'none';
-    } else {
-      option.style.display = 'block';
-    }
-  });
-});
-
 // Debounce function with immediate option
 function debounce(func, wait, immediate = false) {
   let timeout;
@@ -679,21 +654,27 @@ document.addEventListener('DOMContentLoaded', function() {
   const customSelect = document.querySelector('.custom-select');
   const select = document.querySelector('#texture');
   const options = document.querySelectorAll('.option');
-  const settingsToggle = document.querySelector('#settings-toggle');
-  const settingsContent = document.querySelector('#settings-content');
-  const radialBlurSlider = document.querySelector('#radialBlur');
 
   if (customSelect && select) {
     const selected = document.createElement('div');
     selected.className = 'selected';
     selected.textContent = select.options[select.selectedIndex].text;
+    selected.tabIndex = 0;
+    selected.setAttribute('role', 'button');
+    selected.setAttribute('aria-haspopup', 'listbox');
+    selected.setAttribute('aria-expanded', 'false');
     customSelect.insertBefore(selected, customSelect.firstChild);
+
+    function setOpen(open) {
+      customSelect.classList.toggle('active', open);
+      selected.setAttribute('aria-expanded', String(open));
+    }
 
     // Ouvre/ferme le menu uniquement si on clique sur .selected
     selected.addEventListener('click', function(e) {
       e.stopPropagation();
-      customSelect.classList.toggle('active');
-      
+      setOpen(!customSelect.classList.contains('active'));
+
       // Mettre à jour la visibilité des options
       const currentValue = select.value;
       options.forEach(option => {
@@ -705,41 +686,47 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     });
 
+    selected.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        selected.click();
+      }
+    });
+
+    customSelect.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        setOpen(false);
+        selected.focus();
+      }
+    });
+
     options.forEach(option => {
+      option.tabIndex = 0;
       option.addEventListener('click', function(e) {
         e.stopPropagation();
         const value = this.getAttribute('data-value');
         select.value = value;
         selected.textContent = this.textContent;
-        customSelect.classList.remove('active');
+        setOpen(false);
         // Déclencher l'événement change sur le select original
         const event = new Event('change');
         select.dispatchEvent(event);
       });
+      option.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          this.click();
+          selected.focus();
+        }
+      });
     });
-  }
 
-  // Fermer le menu si on clique en dehors
-  document.addEventListener('click', function(e) {
-    if (customSelect && !customSelect.contains(e.target)) {
-      customSelect.classList.remove('active');
-    }
-  });
-
-  // Gestion du panneau de réglages
-  if (settingsToggle && settingsContent) {
-    settingsToggle.addEventListener('click', () => {
-      settingsToggle.classList.toggle('active');
-      settingsContent.classList.toggle('active');
+    // Fermer le menu si on clique en dehors
+    document.addEventListener('click', function(e) {
+      if (!customSelect.contains(e.target)) {
+        setOpen(false);
+      }
     });
-  }
-
-  // Mettre à jour les valeurs du slider de flou radial
-  if (radialBlurSlider) {
-    radialBlurSlider.min = "0";
-    radialBlurSlider.max = "5";
-    radialBlurSlider.step = "0.1";
-    radialBlurSlider.value = "0";
   }
 
   // Ajouter un gestionnaire pour le changement d'orientation

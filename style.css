@@ -8,6 +8,16 @@ html, body {
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+
+button,
+label,
+.option,
+.selected {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -147,7 +157,11 @@ body {
   background-color: #FFBF00;
   color: #0F0F0F;
   border: none;
-  transition: background-color 0.2s ease-in-out;
+  transition: background-color 0.2s ease-in-out, transform 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.upload-label:active {
+  transform: scale(0.98);
 }
 
 .upload-label:hover {
@@ -174,6 +188,23 @@ body {
   color: #FFBF00;
   border: 2px solid #FFBF00;
   transition: all 0.2s ease-in-out;
+}
+
+#download:active {
+  transform: scale(0.98);
+}
+
+#download:focus-visible,
+#sheet-handle:focus-visible,
+.texture-chip:focus-visible,
+.option:focus-visible,
+.custom-select .selected:focus-visible {
+  outline: 2px solid #FFBF00;
+  outline-offset: 2px;
+}
+
+#download:disabled {
+  cursor: default;
 }
 
 #download .material-icon {
@@ -241,6 +272,11 @@ input[type="range"]::-webkit-slider-thumb {
   pointer-events: auto;
   border: 2px solid #0F0F0F;
   box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.15);
 }
 
 input[type="range"]::-moz-range-thumb {
@@ -441,12 +477,17 @@ input[type="range"]::-moz-range-track {
     justify-content: center;
     align-items: center;
     flex: none;
+    min-height: 44px;
     background: none;
     border: none;
     padding: 14px 0 12px;
     margin: 0 -20px;
     cursor: grab;
     touch-action: none;
+  }
+
+  #sheet-handle:active {
+    cursor: grabbing;
   }
 
   #sheet-handle .grabber {
@@ -532,6 +573,11 @@ input[type="range"]::-moz-range-track {
     position: relative;
     cursor: pointer;
     scroll-snap-align: center;
+    transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.15s ease-out;
+  }
+
+  .texture-chip:active {
+    transform: scale(0.94);
   }
 
   .texture-chip span {
@@ -581,7 +627,18 @@ input[type="range"]::-moz-range-track {
   #sheet-handle .grabber,
   #drag-message,
   #drag-message .material-icon,
-  #drag-message p {
+  #drag-message p,
+  .texture-chip,
+  .upload-label,
+  #download,
+  input[type="range"]::-webkit-slider-thumb {
     transition: none;
+  }
+
+  .texture-chip:active,
+  .upload-label:active,
+  #download:active,
+  input[type="range"]:active::-webkit-slider-thumb {
+    transform: none;
   }
 }
