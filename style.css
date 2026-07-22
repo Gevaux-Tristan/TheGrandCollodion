@@ -472,11 +472,12 @@ input[type="range"]::-moz-range-track {
     height: 48px;
     display: grid;
     place-items: center;
-    background: rgba(15, 15, 15, 0.78);
-    border: 1px solid #FFBF00;
+    background: #FFBF00;
+    border: none;
     border-radius: 50%;
-    color: #FFBF00;
+    color: #0F0F0F;
     cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
     transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
@@ -487,6 +488,8 @@ input[type="range"]::-moz-range-track {
   .icon-btn .material-icon {
     margin-right: 0;
     font-size: 22px;
+    /* Debossed: a light lower edge makes the dark glyph read as pressed in */
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
   }
 
   /* Bottom bar: root / settings / editor / texture states */
