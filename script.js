@@ -83,6 +83,15 @@ async function loadOptimizedTexture(src) {
     });
 }
 
+// Offline: register the service worker (relative path for GitHub Pages subpath)
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(error => {
+            console.error('Service worker registration failed:', error);
+        });
+    });
+}
+
 // Attendre que le DOM soit complètement chargé
 document.addEventListener('DOMContentLoaded', initializeApp);
 
