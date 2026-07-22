@@ -13,6 +13,10 @@ const MOBILE_SCALE = 0.25;
 const DESKTOP_SCALE = 0.5;
 const isMobile = window.innerWidth <= 900;
 
+// Radial blur focus point, normalized to the image (0-1). Tapping or
+// dragging on the loaded photo moves it.
+const blurCenter = { x: 0.5, y: 0.5 };
+
 // Grain: one cached tile of monochrome noise, tiled over the image at
 // render time. 256px is fine enough to avoid visible repetition.
 let grainCanvas = null;
@@ -141,6 +145,62 @@ function initializeApp() {
     setupSliderValues();
     setupMobilePanel();
     setupTapToUpload(elements.previewContainer, elements.imageInput);
+    setupBlurFocus(elements.previewContainer, elements.canvas);
+}
+
+// Tap or drag on the loaded photo to place the radial blur focus point.
+// A reticle shows where the sharp zone is anchored, then fades out.
+function setupBlurFocus(previewContainer, canvas) {
+    const reticle = document.createElement('div');
+    reticle.id = 'blur-focus-reticle';
+    previewContainer.appendChild(reticle);
+    let hideTimer = null;
+    let dragging = false;
+
+    function showReticle() {
+        if (!originalImage) return;
+        const rect = canvas.getBoundingClientRect();
+        const parentRect = previewContainer.getBoundingClientRect();
+        reticle.style.left = (rect.left - parentRect.left + blurCenter.x * rect.width) + 'px';
+        reticle.style.top = (rect.top - parentRect.top + blurCenter.y * rect.height) + 'px';
+        reticle.classList.add('visible');
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => reticle.classList.remove('visible'), 1200);
+    }
+
+    function setFromEvent(e) {
+        const rect = canvas.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        blurCenter.x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+        blurCenter.y = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+        showReticle();
+        applyPreviewEffects(false);
+    }
+
+    previewContainer.addEventListener('pointerdown', (e) => {
+        if (!originalImage) return;
+        dragging = true;
+        isSliding = true;
+        setFromEvent(e);
+    });
+
+    previewContainer.addEventListener('pointermove', (e) => {
+        if (dragging) setFromEvent(e);
+    });
+
+    function endDrag() {
+        if (!dragging) return;
+        dragging = false;
+        isSliding = false;
+        applyPreviewEffects(true);
+    }
+
+    window.addEventListener('pointerup', endDrag);
+    window.addEventListener('pointercancel', endDrag);
+
+    // Adjusting the blur slider also reveals where the focus point sits
+    const blurSlider = document.getElementById('radialBlur');
+    if (blurSlider) blurSlider.addEventListener('input', showReticle);
 }
 
 // Live value readouts next to each slider label
@@ -516,47 +576,8 @@ function loadImage(file) {
     reader.readAsDataURL(file);
 }
 
-function applyRadialBlur(targetCtx, width, height, intensity, isPreviewBlur = false) {
-    const tempCopyCanvas = document.createElement('canvas');
-    const tempCopyCtx = tempCopyCanvas.getContext('2d');
-    tempCopyCanvas.width = width;
-    tempCopyCanvas.height = height;
-    
-    // Copy current content of targetCtx (which should have contrast/exposure applied)
-    tempCopyCtx.drawImage(targetCtx.canvas, 0, 0);
-
-    targetCtx.save(); // Save state of targetCtx
-    
-    const centerX = width / 2;
-    const centerY = height / 2;
-    const radius = Math.max(width, height) / 2;
-    
-    const gradient = targetCtx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
-    
-    // Adjust intensity for gradient and blur radius for preview
-    const gradientEffectIntensity = isPreviewBlur ? intensity / 15 : intensity / 10;
-    let blurPx = intensity * 2;
-    if (isPreviewBlur) {
-        blurPx = Math.max(1, intensity * 1); // Less blur for preview, e.g., max 5px if intensity max is 5
-    }
-
-    gradient.addColorStop(0, `rgba(0, 0, 0, ${gradientEffectIntensity})`);
-    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    
-    targetCtx.filter = `blur(${blurPx}px)`;
-    targetCtx.drawImage(tempCopyCanvas, 0, 0); // Draw the copied content, now blurred, back onto targetCtx
-    targetCtx.filter = 'none';
-    
-    targetCtx.globalCompositeOperation = 'destination-out';
-    targetCtx.fillStyle = gradient;
-    targetCtx.fillRect(0, 0, width, height); // Apply radial mask
-    
-    targetCtx.restore(); // Restore state of targetCtx
-    tempCopyCanvas.remove();
-}
-
 function applyEffects(ctx, canvasWidth, canvasHeight, settings, isLowRes = false) {
-    const { contrast, exposure, radialBlur, opacity, grain, texture, imageData: baseGrayscaleImageData } = settings;
+    const { contrast, exposure, radialBlur, opacity, grain, texture, blurCenter: focus, imageData: baseGrayscaleImageData } = settings;
 
     let sourceWidth = baseGrayscaleImageData.width;
     let sourceHeight = baseGrayscaleImageData.height;
@@ -624,9 +645,14 @@ function applyEffects(ctx, canvasWidth, canvasHeight, settings, isLowRes = false
         maskCanvas.width = sourceWidth;
         maskCanvas.height = sourceHeight;
         const maskCtx = maskCanvas.getContext('2d');
-        const centerX = sourceWidth / 2;
-        const centerY = sourceHeight / 2;
-        const maxRadius = Math.sqrt(centerX * centerX + centerY * centerY);
+        // Focus point in normalized coords; the radius reaches the farthest
+        // corner so edges blur fully wherever the focus sits
+        const centerX = (focus ? focus.x : 0.5) * sourceWidth;
+        const centerY = (focus ? focus.y : 0.5) * sourceHeight;
+        const maxRadius = Math.sqrt(
+            Math.pow(Math.max(centerX, sourceWidth - centerX), 2) +
+            Math.pow(Math.max(centerY, sourceHeight - centerY), 2)
+        );
         const maskGradient = maskCtx.createRadialGradient(centerX, centerY, 0, centerX, centerY, maxRadius);
         // Smooth transition: no blur at center, increasing to full blur at edges
         maskGradient.addColorStop(0.0, 'rgba(0,0,0,0)');
@@ -737,6 +763,7 @@ function applyPreviewEffects(forceFullQuality = false) {
         opacity: parseFloat(document.getElementById('opacity').value),
         grain: parseFloat(document.getElementById('grain').value),
         texture: textureImage,
+        blurCenter: blurCenter,
         imageData: cachedImageData
     };
 

@@ -4,7 +4,7 @@
 // - CSS/JS: stale-while-revalidate (updates land one reload later)
 // - textures, images, fonts (incl. Google Fonts): cache-first, cached on first use
 // The app preloads every texture at startup, so one online visit fills the cache.
-const CACHE_VERSION = 'collodion-v1';
+const CACHE_VERSION = 'collodion-v2';
 const SHELL_CACHE = CACHE_VERSION + '-shell';
 const RUNTIME_CACHE = CACHE_VERSION + '-runtime';
 
