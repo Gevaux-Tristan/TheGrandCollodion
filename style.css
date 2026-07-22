@@ -477,7 +477,6 @@ input[type="range"]::-moz-range-track {
     border-radius: 50%;
     color: #0F0F0F;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
     transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
@@ -488,8 +487,6 @@ input[type="range"]::-moz-range-track {
   .icon-btn .material-icon {
     margin-right: 0;
     font-size: 22px;
-    /* Debossed: a light lower edge makes the dark glyph read as pressed in */
-    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
   }
 
   /* Bottom bar: root / settings / editor / texture states */
@@ -554,8 +551,18 @@ input[type="range"]::-moz-range-track {
     gap: 0;
   }
 
+  /* Five settings plus the back button: let items shrink on narrow phones */
+  .m-settings [data-slider] {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 6px 2px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
   .m-settings .m-back {
-    min-width: 48px;
+    flex: 0 0 44px;
+    min-width: 44px;
   }
 
   .m-settings .m-back .material-icon {

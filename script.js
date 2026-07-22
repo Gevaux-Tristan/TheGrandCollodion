@@ -13,6 +13,27 @@ const MOBILE_SCALE = 0.25;
 const DESKTOP_SCALE = 0.5;
 const isMobile = window.innerWidth <= 900;
 
+// Grain: one cached tile of monochrome noise, tiled over the image at
+// render time. 256px is fine enough to avoid visible repetition.
+let grainCanvas = null;
+function getGrainCanvas() {
+    if (grainCanvas) return grainCanvas;
+    const size = 256;
+    grainCanvas = document.createElement('canvas');
+    grainCanvas.width = size;
+    grainCanvas.height = size;
+    const ctx = grainCanvas.getContext('2d');
+    const noise = ctx.createImageData(size, size);
+    const data = noise.data;
+    for (let i = 0; i < data.length; i += 4) {
+        const value = 128 + (Math.random() - 0.5) * 220;
+        data[i] = data[i + 1] = data[i + 2] = value;
+        data[i + 3] = 255;
+    }
+    ctx.putImageData(noise, 0, 0);
+    return grainCanvas;
+}
+
 // Texture optimization
 const textureCache = new Map();
 const PREVIEW_TEXTURE_SIZE = 1024; // Maximum size for preview textures
@@ -74,6 +95,7 @@ function initializeApp() {
         previewContainer: document.getElementById('preview-container'),
         contrastSlider: document.getElementById('contrast'),
         opacitySlider: document.getElementById('opacity'),
+        grainSlider: document.getElementById('grain'),
         exposureSlider: document.getElementById('exposure'),
         radialBlurSlider: document.getElementById('radialBlur'),
         downloadButton: document.getElementById('download'),
@@ -116,6 +138,7 @@ function initializeApp() {
 const SLIDER_FORMATTERS = {
     contrast: v => v.toFixed(1),
     opacity: v => Math.round(v * 100) + '%',
+    grain: v => Math.round(v * 100) + '%',
     exposure: v => (v > 0 ? '+' : '') + v.toFixed(1),
     radialBlur: v => v.toFixed(1)
 };
@@ -137,6 +160,7 @@ function setupSliderValues() {
 const SLIDER_LABELS = {
     contrast: 'Contrast',
     opacity: 'Texture opacity',
+    grain: 'Grain',
     exposure: 'Exposure',
     radialBlur: 'Radial Blur'
 };
@@ -347,6 +371,7 @@ function setupSliders(elements) {
     const sliders = [
         elements.contrastSlider,
         elements.opacitySlider,
+        elements.grainSlider,
         elements.exposureSlider,
         elements.radialBlurSlider
     ];
@@ -521,7 +546,7 @@ function applyRadialBlur(targetCtx, width, height, intensity, isPreviewBlur = fa
 }
 
 function applyEffects(ctx, canvasWidth, canvasHeight, settings, isLowRes = false) {
-    const { contrast, exposure, radialBlur, opacity, texture, imageData: baseGrayscaleImageData } = settings;
+    const { contrast, exposure, radialBlur, opacity, grain, texture, imageData: baseGrayscaleImageData } = settings;
 
     let sourceWidth = baseGrayscaleImageData.width;
     let sourceHeight = baseGrayscaleImageData.height;
@@ -626,6 +651,16 @@ function applyEffects(ctx, canvasWidth, canvasHeight, settings, isLowRes = false
     
     workingCanvasForEffects.remove();
 
+    // Apply Grain (tiled monochrome noise, contrast-neutral around mid-gray)
+    if (grain > 0) {
+        ctx.globalAlpha = grain * 0.45;
+        ctx.globalCompositeOperation = 'overlay';
+        ctx.fillStyle = ctx.createPattern(getGrainCanvas(), 'repeat');
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+        ctx.globalAlpha = 1.0;
+        ctx.globalCompositeOperation = 'source-over';
+    }
+
     // Apply Texture Overlay
     if (texture && texture.complete && opacity > 0) {
         ctx.globalAlpha = opacity;
@@ -690,6 +725,7 @@ function applyPreviewEffects(forceFullQuality = false) {
         exposure: parseFloat(document.getElementById('exposure').value),
         radialBlur: parseFloat(document.getElementById('radialBlur').value),
         opacity: parseFloat(document.getElementById('opacity').value),
+        grain: parseFloat(document.getElementById('grain').value),
         texture: textureImage,
         imageData: cachedImageData
     };

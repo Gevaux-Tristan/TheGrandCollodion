@@ -60,6 +60,7 @@
         <button type="button" class="m-back" aria-label="Back"><span class="material-icon">close</span></button>
         <button type="button" data-slider="contrast"><span class="material-icon">tonality</span>Contrast</button>
         <button type="button" data-slider="opacity"><span class="material-icon">opacity</span>Opacity</button>
+        <button type="button" data-slider="grain"><span class="material-icon">grain</span>Grain</button>
         <button type="button" data-slider="exposure"><span class="material-icon">exposure</span>Exposure</button>
         <button type="button" data-slider="radialBlur"><span class="material-icon">blur_on</span>Blur</button>
       </div>
@@ -99,6 +100,13 @@
             <output for="opacity" data-slider="opacity"></output>
           </div>
           <input type="range" id="opacity" min="0" max="1" step="0.01" value="0.55" />
+        </div>
+        <div class="control">
+          <div class="control-head">
+            <label for="grain">Grain</label>
+            <output for="grain" data-slider="grain"></output>
+          </div>
+          <input type="range" id="grain" min="0" max="1" step="0.01" value="0" />
         </div>
         <div class="control">
           <div class="control-head">
