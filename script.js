@@ -129,7 +129,7 @@ function initializeApp() {
     ctx.imageSmoothingQuality = 'high';
 
     // Initialize texture with optimization
-    loadOptimizedTexture("Collodion-01.png").then(texture => {
+    loadOptimizedTexture("Collodion-01.jpg").then(texture => {
         textureImage = texture.preview;
     });
     elements.opacitySlider.value = "0.75";
