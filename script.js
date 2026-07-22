@@ -17,6 +17,39 @@ const isMobile = window.innerWidth <= 900;
 // dragging on the loaded photo moves it.
 const blurCenter = { x: 0.5, y: 0.5 };
 
+// 4:5 frame: mode 'off' | 'white' | 'black'; x/y place the photo within
+// the frame margins (0-1, 0.5 = centered). Scale lives in the #frameScale
+// slider. The photo is drawn at native resolution when scale is 1.
+const frame = { mode: 'off', x: 0.5, y: 0.5 };
+let framePhotoCanvas = null;
+
+function frameScaleValue() {
+    const slider = document.getElementById('frameScale');
+    return slider ? parseFloat(slider.value) : 1;
+}
+
+// Frame + photo geometry in canvas pixels for the current image and scale
+function computeFrameLayout() {
+    const photoW = originalImage.width;
+    const photoH = originalImage.height;
+    let frameW, frameH;
+    if (photoW / photoH > 4 / 5) {
+        frameW = photoW;
+        frameH = Math.round(photoW * 5 / 4);
+    } else {
+        frameH = photoH;
+        frameW = Math.round(photoH * 4 / 5);
+    }
+    const scale = frameScaleValue();
+    const w = photoW * scale;
+    const h = photoH * scale;
+    return {
+        frameW, frameH, w, h,
+        dx: (frameW - w) * frame.x,
+        dy: (frameH - h) * frame.y
+    };
+}
+
 // Grain: one cached tile of monochrome noise, tiled over the image at
 // render time. 256px is fine enough to avoid visible repetition.
 let grainCanvas = null;
@@ -111,6 +144,7 @@ function initializeApp() {
         grainSlider: document.getElementById('grain'),
         exposureSlider: document.getElementById('exposure'),
         radialBlurSlider: document.getElementById('radialBlur'),
+        frameScaleSlider: document.getElementById('frameScale'),
         downloadButton: document.getElementById('download'),
         textureSelect: document.getElementById('texture')
     };
@@ -143,37 +177,81 @@ function initializeApp() {
     setupTextureSelect(elements.textureSelect);
     buildTextureChips(elements.textureSelect);
     setupSliderValues();
+    setupFrameControls();
     setupMobilePanel();
     setupTapToUpload(elements.previewContainer, elements.imageInput);
     setupBlurFocus(elements.previewContainer, elements.canvas);
 }
 
-// Tap or drag on the loaded photo to place the radial blur focus point.
-// A reticle shows where the sharp zone is anchored, then fades out.
+// Tap or drag on the loaded photo. Default: place the radial blur focus
+// point (amber reticle). When the 4:5 frame is on (and the blur editor is
+// not open), dragging positions the photo inside the frame instead.
 function setupBlurFocus(previewContainer, canvas) {
     const reticle = document.createElement('div');
     reticle.id = 'blur-focus-reticle';
     previewContainer.appendChild(reticle);
     let hideTimer = null;
     let dragging = false;
+    let dragMode = 'blur';
+    let start = null;
+
+    function blurEditorOpen() {
+        const panel = document.getElementById('mobile-panel');
+        return !!(panel && panel.dataset.mode === 'editor' && document.querySelector('#m-editor-slot #radialBlur'));
+    }
+
+    function dragTarget() {
+        if (blurEditorOpen()) return 'blur';
+        if (frame.mode !== 'off') return 'frame';
+        return 'blur';
+    }
 
     function showReticle() {
         if (!originalImage) return;
         const rect = canvas.getBoundingClientRect();
         const parentRect = previewContainer.getBoundingClientRect();
-        reticle.style.left = (rect.left - parentRect.left + blurCenter.x * rect.width) + 'px';
-        reticle.style.top = (rect.top - parentRect.top + blurCenter.y * rect.height) + 'px';
+        let left = blurCenter.x * rect.width;
+        let top = blurCenter.y * rect.height;
+        if (frame.mode !== 'off') {
+            const layout = computeFrameLayout();
+            left = (layout.dx + blurCenter.x * layout.w) / layout.frameW * rect.width;
+            top = (layout.dy + blurCenter.y * layout.h) / layout.frameH * rect.height;
+        }
+        reticle.style.left = (rect.left - parentRect.left + left) + 'px';
+        reticle.style.top = (rect.top - parentRect.top + top) + 'px';
         reticle.classList.add('visible');
         clearTimeout(hideTimer);
         hideTimer = setTimeout(() => reticle.classList.remove('visible'), 1200);
     }
 
-    function setFromEvent(e) {
+    function setBlurFromEvent(e) {
         const rect = canvas.getBoundingClientRect();
         if (!rect.width || !rect.height) return;
-        blurCenter.x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-        blurCenter.y = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+        let nx = (e.clientX - rect.left) / rect.width;
+        let ny = (e.clientY - rect.top) / rect.height;
+        if (frame.mode !== 'off') {
+            const layout = computeFrameLayout();
+            nx = layout.w ? (nx * layout.frameW - layout.dx) / layout.w : 0.5;
+            ny = layout.h ? (ny * layout.frameH - layout.dy) / layout.h : 0.5;
+        }
+        blurCenter.x = Math.min(1, Math.max(0, nx));
+        blurCenter.y = Math.min(1, Math.max(0, ny));
         showReticle();
+        applyPreviewEffects(false);
+    }
+
+    function moveFrameFromEvent(e) {
+        const rect = canvas.getBoundingClientRect();
+        if (!rect.width || !start) return;
+        const layout = computeFrameLayout();
+        const marginX = (layout.frameW - layout.w) / layout.frameW * rect.width;
+        const marginY = (layout.frameH - layout.h) / layout.frameH * rect.height;
+        frame.x = marginX > 0
+            ? Math.min(1, Math.max(0, start.x + (e.clientX - start.clientX) / marginX))
+            : 0.5;
+        frame.y = marginY > 0
+            ? Math.min(1, Math.max(0, start.y + (e.clientY - start.clientY) / marginY))
+            : 0.5;
         applyPreviewEffects(false);
     }
 
@@ -181,11 +259,15 @@ function setupBlurFocus(previewContainer, canvas) {
         if (!originalImage) return;
         dragging = true;
         isSliding = true;
-        setFromEvent(e);
+        dragMode = dragTarget();
+        start = { clientX: e.clientX, clientY: e.clientY, x: frame.x, y: frame.y };
+        if (dragMode === 'blur') setBlurFromEvent(e);
     });
 
     previewContainer.addEventListener('pointermove', (e) => {
-        if (dragging) setFromEvent(e);
+        if (!dragging) return;
+        if (dragMode === 'blur') setBlurFromEvent(e);
+        else moveFrameFromEvent(e);
     });
 
     function endDrag() {
@@ -203,13 +285,26 @@ function setupBlurFocus(previewContainer, canvas) {
     if (blurSlider) blurSlider.addEventListener('input', showReticle);
 }
 
+// Frame background chips (Aucun / Blanc / Noir), shared by both layouts
+function setupFrameControls() {
+    const bgButtons = document.querySelectorAll('#frame-bg-buttons button');
+    bgButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            frame.mode = btn.dataset.bg;
+            bgButtons.forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+            applyPreviewEffects(true);
+        });
+    });
+}
+
 // Live value readouts next to each slider label
 const SLIDER_FORMATTERS = {
     contrast: v => v.toFixed(1),
     opacity: v => Math.round(v * 100) + '%',
     grain: v => Math.round(v * 100) + '%',
     exposure: v => (v > 0 ? '+' : '') + v.toFixed(1),
-    radialBlur: v => v.toFixed(1)
+    radialBlur: v => v.toFixed(1),
+    frameScale: v => Math.round(v * 100) + '%'
 };
 
 function setupSliderValues() {
@@ -247,6 +342,10 @@ function setupMobilePanel() {
     let sliderHome = null;
     let prevValue = null;
     let prevTexture = null;
+    let prevFrame = null;
+    let frameHome = null;
+    const frameControl = document.getElementById('frame-control');
+    const frameSlot = document.getElementById('m-frame-slot');
 
     function setMode(mode) {
         panel.dataset.mode = mode;
@@ -285,16 +384,48 @@ function setupMobilePanel() {
         setMode('settings');
     }
 
+    function openFrame() {
+        prevFrame = {
+            mode: frame.mode,
+            x: frame.x,
+            y: frame.y,
+            scale: document.getElementById('frameScale').value
+        };
+        frameHome = { parent: frameControl.parentNode, next: frameControl.nextSibling };
+        frameSlot.appendChild(frameControl);
+        setMode('frame');
+    }
+
+    function closeFrame(apply) {
+        if (!apply && prevFrame) {
+            frame.mode = prevFrame.mode;
+            frame.x = prevFrame.x;
+            frame.y = prevFrame.y;
+            document.getElementById('frameScale').value = prevFrame.scale;
+            document.querySelectorAll('#frame-bg-buttons button').forEach(b =>
+                b.setAttribute('aria-pressed', String(b.dataset.bg === frame.mode)));
+            document.getElementById('frameScale').dispatchEvent(new Event('input'));
+            applyPreviewEffects(true);
+        }
+        if (frameHome) frameHome.parent.insertBefore(frameControl, frameHome.next);
+        setMode('root');
+    }
+
     panel.querySelectorAll('.m-root [data-open]').forEach(btn => {
         btn.addEventListener('click', () => {
             if (btn.dataset.open === 'texture') {
                 prevTexture = select.value;
                 setMode('texture');
+            } else if (btn.dataset.open === 'frame') {
+                openFrame();
             } else {
                 setMode('settings');
             }
         });
     });
+
+    document.getElementById('m-frame-cancel').addEventListener('click', () => closeFrame(false));
+    document.getElementById('m-frame-apply').addEventListener('click', () => closeFrame(true));
 
     document.getElementById('m-set-cancel').addEventListener('click', () => setMode('root'));
     document.getElementById('m-set-apply').addEventListener('click', () => setMode('root'));
@@ -330,6 +461,7 @@ function setupMobilePanel() {
         mq.addEventListener('change', () => {
             if (!mq.matches) {
                 if (activeSlider) closeEditor(true);
+                if (panel.dataset.mode === 'frame') closeFrame(true);
                 setMode('root');
             }
         });
@@ -443,7 +575,8 @@ function setupSliders(elements) {
         elements.opacitySlider,
         elements.grainSlider,
         elements.exposureSlider,
-        elements.radialBlurSlider
+        elements.radialBlurSlider,
+        elements.frameScaleSlider
     ];
 
     sliders.forEach(slider => {
@@ -767,7 +900,27 @@ function applyPreviewEffects(forceFullQuality = false) {
         imageData: cachedImageData
     };
 
-    applyEffects(ctx, canvas.width, canvas.height, settings, isSliding && !forceFullQuality);
+    const lowRes = isSliding && !forceFullQuality;
+
+    if (frame.mode === 'off') {
+        applyEffects(ctx, canvas.width, canvas.height, settings, lowRes);
+    } else {
+        // Render the processed photo offscreen, then compose it on the 4:5
+        // background at the user's scale and position
+        if (!framePhotoCanvas) framePhotoCanvas = document.createElement('canvas');
+        framePhotoCanvas.width = originalImage.width;
+        framePhotoCanvas.height = originalImage.height;
+        applyEffects(framePhotoCanvas.getContext('2d'), framePhotoCanvas.width, framePhotoCanvas.height, settings, lowRes);
+
+        const layout = computeFrameLayout();
+        canvas.width = layout.frameW;
+        canvas.height = layout.frameH;
+        ctx.fillStyle = frame.mode === 'white' ? '#FFFFFF' : '#000000';
+        ctx.fillRect(0, 0, layout.frameW, layout.frameH);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(framePhotoCanvas, layout.dx, layout.dy, layout.w, layout.h);
+    }
 
     isProcessing = false;
     if (needsUpdate) {

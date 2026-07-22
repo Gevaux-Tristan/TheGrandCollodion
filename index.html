@@ -56,6 +56,7 @@
         <div class="m-root-row">
           <button type="button" data-open="texture"><span class="material-icon">texture</span>Texture</button>
           <button type="button" data-open="settings"><span class="material-icon">tune</span>Réglages</button>
+          <button type="button" data-open="frame"><span class="material-icon">crop_portrait</span>Cadre</button>
         </div>
         <div class="m-actions">
           <button type="button" id="m-root-cancel" aria-label="Close"><span class="material-icon">close</span></button>
@@ -91,6 +92,13 @@
         <div class="m-actions">
           <button type="button" id="m-tex-cancel" aria-label="Cancel"><span class="material-icon">close</span></button>
           <button type="button" id="m-tex-apply" aria-label="Apply"><span class="material-icon">check</span></button>
+        </div>
+      </div>
+      <div class="m-frame">
+        <div id="m-frame-slot"></div>
+        <div class="m-actions">
+          <button type="button" id="m-frame-cancel" aria-label="Cancel"><span class="material-icon">close</span></button>
+          <button type="button" id="m-frame-apply" aria-label="Apply"><span class="material-icon">check</span></button>
         </div>
       </div>
     </div>
@@ -187,6 +195,18 @@
             <div class="option" data-value="Collodion-22.jpg">Collodion-22</div>
           </div>
         </div>
+      </div>
+      <div class="control" id="frame-control">
+        <div class="control-head">
+          <label for="frameScale">Frame 4:5</label>
+          <output for="frameScale" data-slider="frameScale"></output>
+        </div>
+        <div id="frame-bg-buttons" role="group" aria-label="Frame background">
+          <button type="button" data-bg="off" aria-pressed="true">Aucun</button>
+          <button type="button" data-bg="white" aria-pressed="false">Blanc</button>
+          <button type="button" data-bg="black" aria-pressed="false">Noir</button>
+        </div>
+        <input type="range" id="frameScale" min="0.5" max="1" step="0.01" value="1" />
       </div>
       <div id="sheet-actions">
         <label class="upload-label">

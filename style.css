@@ -297,6 +297,37 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Frame background chips: Aucun / Blanc / Noir */
+#frame-bg-buttons {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+#frame-bg-buttons button {
+  flex: 1;
+  padding: 9px 4px;
+  background: #0F0F0F;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  color: #bfbfbf;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: border-color 0.15s ease-out, color 0.15s ease-out;
+}
+
+#frame-bg-buttons button[aria-pressed="true"] {
+  border-color: #FFBF00;
+  color: #FFBF00;
+}
+
+#frame-bg-buttons button:focus-visible {
+  outline: 2px solid #FFBF00;
+  outline-offset: 2px;
+}
+
 input[type="range"] {
   width: 100%;
   -webkit-appearance: none;
@@ -450,6 +481,7 @@ input[type="range"]::-moz-range-track {
   #sheet-actions .upload-label { order: 1; }
   #sheet-sliders .control { order: 2; }
   #texture-control { order: 3; }
+  #frame-control { order: 3; }
   #download { order: 4; margin-bottom: 50px; }
 }
 
@@ -546,14 +578,20 @@ input[type="range"]::-moz-range-track {
   #mobile-panel[data-mode="root"] .m-root,
   #mobile-panel[data-mode="settings"] .m-settings,
   #mobile-panel[data-mode="editor"] .m-editor,
-  #mobile-panel[data-mode="texture"] .m-texture {
+  #mobile-panel[data-mode="texture"] .m-texture,
+  #mobile-panel[data-mode="frame"] .m-frame {
     display: block;
+  }
+
+  #m-frame-slot .control {
+    gap: 12px;
+    padding-top: 6px;
   }
 
   .m-root-row {
     display: flex;
     justify-content: center;
-    gap: 56px;
+    gap: 36px;
     padding-top: 4px;
   }
 
