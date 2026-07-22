@@ -82,6 +82,7 @@ body {
   font-size: 30px;
   display: block;
   margin-bottom: -8px;
+  margin-right: 0;
   transition: all 0.3s ease;
 }
 
@@ -106,7 +107,7 @@ body {
   opacity: 0;
 }
 
-/* ===== Controls panel ===== */
+/* ===== Controls panel (desktop sidebar) ===== */
 
 #controls-panel {
   width: 380px;
@@ -129,10 +130,8 @@ body {
 }
 
 /* Hidden by default (mobile-only elements) */
-#sheet-handle,
-#sheet-scrim,
-#texture-chips,
-#slider-dots,
+#mobile-topbar,
+#mobile-panel,
 .mobile-only {
   display: none;
 }
@@ -196,9 +195,10 @@ body {
 }
 
 #download:focus-visible,
-#sheet-handle:focus-visible,
 .texture-chip:focus-visible,
 .option:focus-visible,
+.icon-btn:focus-visible,
+#mobile-panel button:focus-visible,
 .custom-select .selected:focus-visible {
   outline: 2px solid #FFBF00;
   outline-offset: 2px;
@@ -229,10 +229,6 @@ body {
   font-size: 18px;
   vertical-align: middle;
   margin-right: 6px;
-}
-
-#drag-message .material-icon {
-  margin-right: 0;
 }
 
 /* ===== Sliders ===== */
@@ -418,139 +414,26 @@ input[type="range"]::-moz-range-track {
   #download { order: 4; margin-bottom: 50px; }
 }
 
-/* ===== Mobile: bottom sheet ===== */
+/* ===== Mobile: floating top bar + modal bottom bar ===== */
 
 @media (max-width: 900px) {
   .mobile-only { display: block; }
   .desktop-only { display: none; }
-  #logo { display: none; }
 
-  #main-container {
-    display: block;
-  }
+  #controls-panel { display: none; }
+
+  #main-container { display: block; }
 
   #preview-container {
-    height: calc(100vh - var(--sheet-peek, 236px));
-    height: calc(100dvh - var(--sheet-peek, 236px));
+    height: calc(100vh - var(--m-panel-h, 96px));
+    height: calc(100dvh - var(--m-panel-h, 96px));
   }
 
   #drag-message {
     padding: 36px 28px;
   }
 
-  /* Scrim behind the expanded sheet */
-  #sheet-scrim {
-    display: block;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.55);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.32s cubic-bezier(0.22, 1, 0.36, 1);
-    z-index: 900;
-  }
-
-  #sheet-scrim.visible {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  /* The panel becomes the sheet */
-  #controls-panel {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: 100%;
-    flex: none;
-    max-height: calc(100dvh - 24px);
-    padding: 0 20px;
-    padding-bottom: max(16px, env(safe-area-inset-bottom));
-    border-left: none;
-    border-top: 1px solid #FFBF00;
-    border-radius: 16px 16px 0 0;
-    gap: 0;
-    align-items: stretch;
-    overflow: hidden;
-    z-index: 1000;
-    transform: translateY(calc(100% - var(--sheet-peek, 236px)));
-    transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  #controls-panel.expanded {
-    transform: translateY(0);
-    overflow-y: auto;
-  }
-
-  #controls-panel.dragging {
-    transition: none;
-  }
-
-  /* Drag handle */
-  #sheet-handle {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex: none;
-    min-height: 44px;
-    background: none;
-    border: none;
-    padding: 14px 0 12px;
-    margin: 0 -20px;
-    cursor: grab;
-    touch-action: none;
-  }
-
-  #sheet-handle:active {
-    cursor: grabbing;
-  }
-
-  #sheet-handle .grabber {
-    width: 44px;
-    height: 5px;
-    border-radius: 3px;
-    background: #4a4a4a;
-    transition: background 0.2s ease-out;
-  }
-
-  #sheet-handle:active .grabber,
-  #controls-panel.expanded .grabber {
-    background: #FFBF00;
-  }
-
-  /* Always-visible settings: one per page, swipe sideways to change.
-     Only the thumb adjusts the slider; the rest of the row pans the
-     carousel (the track already ignores pointer events). */
-  #sheet-sliders {
-    display: flex;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 2px;
-  }
-
-  #sheet-sliders::-webkit-scrollbar {
-    display: none;
-  }
-
-  #sheet-sliders .control {
-    flex: 0 0 100%;
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
-    gap: 12px;
-    padding: 0 2px;
-  }
-
-  .control label {
-    font-size: 13px;
-    color: #bfbfbf;
-  }
-
-  .control-head output {
-    font-size: 13px;
-  }
-
+  /* A touch on the thumb adjusts the slider without scrolling the page */
   input[type="range"] {
     touch-action: none;
   }
@@ -565,61 +448,178 @@ input[type="range"]::-moz-range-track {
     height: 28px;
   }
 
-  /* Dots: one per setting. Bottom padding doubles as the collapsed
-     sheet's safe-area spacing, since the sheet's own bottom edge sits
-     off-screen while collapsed. */
-  #slider-dots {
+  /* Floating top bar: download left; upload + camera right */
+  #mobile-topbar {
     display: flex;
-    justify-content: center;
-    gap: 4px;
-    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    align-items: center;
+    gap: 10px;
+    padding: max(10px, env(safe-area-inset-top)) 14px 10px;
+    z-index: 500;
+    pointer-events: none;
   }
 
-  .slider-dot {
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    background: none;
-    border: none;
-    cursor: pointer;
+  #mobile-topbar .spacer {
+    flex: 1;
+  }
+
+  .icon-btn {
+    pointer-events: auto;
+    width: 48px;
+    height: 48px;
     display: grid;
     place-items: center;
-  }
-
-  .slider-dot::before {
-    content: "";
-    width: 7px;
-    height: 7px;
+    background: rgba(15, 15, 15, 0.78);
+    border: 1px solid #FFBF00;
     border-radius: 50%;
-    background: #4a4a4a;
-    transition: background 0.2s ease-out, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    color: #FFBF00;
+    cursor: pointer;
+    transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
-  .slider-dot.active::before {
-    background: #FFBF00;
-    transform: scale(1.3);
+  .icon-btn:active {
+    transform: scale(0.92);
   }
 
-  /* Expandable section */
-  #sheet-more {
+  .icon-btn .material-icon {
+    margin-right: 0;
+    font-size: 22px;
+  }
+
+  /* Bottom bar: root / settings / editor / texture states */
+  #mobile-panel {
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #0F0F0F;
+    border-top: 1px solid #FFBF00;
+    padding: 8px 16px max(10px, env(safe-area-inset-bottom));
+    z-index: 1000;
+  }
+
+  #mobile-panel > div { display: none; }
+
+  #mobile-panel[data-mode="root"] .m-root,
+  #mobile-panel[data-mode="settings"] .m-settings {
+    display: flex;
+  }
+
+  #mobile-panel[data-mode="editor"] .m-editor,
+  #mobile-panel[data-mode="texture"] .m-texture {
+    display: block;
+  }
+
+  .m-root {
+    justify-content: center;
+    gap: 56px;
+  }
+
+  .m-root button,
+  .m-settings button {
     display: flex;
     flex-direction: column;
-    gap: 18px;
-    padding-top: 6px;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-width: 60px;
+    min-height: 60px;
+    padding: 6px 6px;
+    background: none;
+    border: none;
+    border-radius: 8px;
+    color: #bfbfbf;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    cursor: pointer;
   }
 
-  /* Texture picker: swipeable thumbnails instead of dropdown */
-  #texture-control .custom-select {
-    display: none;
+  .m-root .material-icon,
+  .m-settings .material-icon {
+    margin-right: 0;
+    font-size: 26px;
+    color: #FFBF00;
   }
 
+  .m-settings {
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 0;
+  }
+
+  .m-settings .m-back {
+    min-width: 48px;
+  }
+
+  .m-settings .m-back .material-icon {
+    color: #8a8a8a;
+  }
+
+  /* Editor state: one slider + cancel / apply */
+  .m-editor-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 6px 2px 12px;
+    font-size: 13px;
+    color: #bfbfbf;
+  }
+
+  #m-editor-value {
+    font-weight: bold;
+    color: #FFBF00;
+    font-variant-numeric: tabular-nums;
+  }
+
+  #m-editor-slot input[type="range"] {
+    width: 100%;
+  }
+
+  .m-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 12px;
+  }
+
+  .m-actions button {
+    width: 56px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    background: none;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  .m-actions .material-icon {
+    margin-right: 0;
+    font-size: 24px;
+  }
+
+  #m-cancel .material-icon,
+  #m-tex-cancel .material-icon {
+    color: #8a8a8a;
+  }
+
+  #m-apply .material-icon,
+  #m-tex-apply .material-icon {
+    color: #FFBF00;
+  }
+
+  /* Texture state: swipeable thumbnails */
   #texture-chips {
     display: flex;
     gap: 10px;
     overflow-x: auto;
     scroll-snap-type: x proximity;
-    padding: 2px 20px 6px;
-    margin: 0 -20px;
+    padding: 6px 16px 2px;
+    margin: 0 -16px;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
   }
@@ -662,48 +662,26 @@ input[type="range"]::-moz-range-track {
     border-color: #FFBF00;
     box-shadow: 0 0 0 1px #FFBF00;
   }
-
-  /* Upload / camera side by side */
-  #sheet-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-
-  #sheet-actions .upload-label {
-    font-size: 14px;
-    padding: 12px 8px;
-  }
-
-  #download {
-    margin: 0;
-  }
 }
 
 /* ===== Reduced motion ===== */
 
 @media (prefers-reduced-motion: reduce) {
-  #controls-panel,
-  #sheet-scrim,
-  #sheet-handle .grabber,
   #drag-message,
   #drag-message .material-icon,
   #drag-message p,
   .texture-chip,
   .upload-label,
   #download,
-  .slider-dot::before,
+  .icon-btn,
   input[type="range"]::-webkit-slider-thumb {
     transition: none;
-  }
-
-  #sheet-sliders {
-    scroll-behavior: auto;
   }
 
   .texture-chip:active,
   .upload-label:active,
   #download:active,
+  .icon-btn:active,
   input[type="range"]:active::-webkit-slider-thumb {
     transform: none;
   }

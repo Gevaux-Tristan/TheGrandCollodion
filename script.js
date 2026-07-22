@@ -108,8 +108,7 @@ function initializeApp() {
     setupTextureSelect(elements.textureSelect);
     buildTextureChips(elements.textureSelect);
     setupSliderValues();
-    setupSliderCarousel();
-    setupBottomSheet();
+    setupMobilePanel();
     setupTapToUpload(elements.previewContainer, elements.imageInput);
 }
 
@@ -132,35 +131,119 @@ function setupSliderValues() {
     });
 }
 
-// Mobile: one setting per page; dots reflect and drive the carousel
-function setupSliderCarousel() {
-    const carousel = document.getElementById('sheet-sliders');
-    const dots = document.getElementById('slider-dots');
-    if (!carousel || !dots) return;
+// Mobile bottom bar: root (Texture / Adjust) -> settings icons -> one slider
+// The active range input is MOVED into the editor slot so there is a single
+// source of truth; cancel restores the value captured on entry.
+const SLIDER_LABELS = {
+    contrast: 'Contrast',
+    opacity: 'Texture opacity',
+    exposure: 'Exposure',
+    radialBlur: 'Radial Blur'
+};
 
-    Array.from(carousel.children).forEach((page, index) => {
-        const dot = document.createElement('button');
-        dot.type = 'button';
-        dot.className = 'slider-dot';
-        const label = page.querySelector('label');
-        dot.setAttribute('aria-label', label ? label.textContent : 'Setting ' + (index + 1));
-        dot.addEventListener('click', () => {
-            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            carousel.scrollTo({
-                left: index * carousel.clientWidth,
-                behavior: reduceMotion ? 'auto' : 'smooth'
-            });
+function setupMobilePanel() {
+    const panel = document.getElementById('mobile-panel');
+    if (!panel) return;
+    const editorSlot = document.getElementById('m-editor-slot');
+    const editorLabel = document.getElementById('m-editor-label');
+    const editorValue = document.getElementById('m-editor-value');
+    const select = document.getElementById('texture');
+    const mq = window.matchMedia('(max-width: 900px)');
+
+    let activeSlider = null;
+    let sliderHome = null;
+    let prevValue = null;
+    let prevTexture = null;
+
+    function setMode(mode) {
+        panel.dataset.mode = mode;
+        requestAnimationFrame(() => {
+            document.documentElement.style.setProperty('--m-panel-h', panel.offsetHeight + 'px');
         });
-        dots.appendChild(dot);
+    }
+
+    function updateEditorValue() {
+        if (!activeSlider) return;
+        const format = SLIDER_FORMATTERS[activeSlider.id] || (v => String(v));
+        editorValue.textContent = format(parseFloat(activeSlider.value));
+    }
+
+    function openSlider(id) {
+        const slider = document.getElementById(id);
+        if (!slider) return;
+        activeSlider = slider;
+        prevValue = slider.value;
+        sliderHome = { parent: slider.parentNode, next: slider.nextSibling };
+        editorSlot.appendChild(slider);
+        editorLabel.textContent = SLIDER_LABELS[id] || id;
+        updateEditorValue();
+        setMode('editor');
+    }
+
+    function closeEditor(apply) {
+        if (!activeSlider) return;
+        if (!apply && activeSlider.value !== prevValue) {
+            activeSlider.value = prevValue;
+            activeSlider.dispatchEvent(new Event('input'));
+            activeSlider.dispatchEvent(new Event('change'));
+        }
+        sliderHome.parent.insertBefore(activeSlider, sliderHome.next);
+        activeSlider = null;
+        setMode('settings');
+    }
+
+    panel.querySelectorAll('.m-root [data-open]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (btn.dataset.open === 'texture') {
+                prevTexture = select.value;
+                setMode('texture');
+            } else {
+                setMode('settings');
+            }
+        });
     });
 
-    const dotButtons = Array.from(dots.children);
-    function update() {
-        const index = Math.round(carousel.scrollLeft / Math.max(1, carousel.clientWidth));
-        dotButtons.forEach((dot, i) => dot.classList.toggle('active', i === index));
+    panel.querySelector('.m-back').addEventListener('click', () => setMode('root'));
+
+    panel.querySelectorAll('.m-settings [data-slider]').forEach(btn => {
+        btn.addEventListener('click', () => openSlider(btn.dataset.slider));
+    });
+
+    editorSlot.addEventListener('input', updateEditorValue);
+    document.getElementById('m-cancel').addEventListener('click', () => closeEditor(false));
+    document.getElementById('m-apply').addEventListener('click', () => closeEditor(true));
+
+    document.getElementById('m-tex-cancel').addEventListener('click', () => {
+        if (prevTexture !== null && select.value !== prevTexture) {
+            select.value = prevTexture;
+            select.dispatchEvent(new Event('change'));
+        }
+        setMode('root');
+    });
+    document.getElementById('m-tex-apply').addEventListener('click', () => setMode('root'));
+
+    // Top bar proxies to the (hidden) desktop controls
+    const proxies = [['m-upload', 'upload'], ['m-camera', 'camera'], ['m-download', 'download']];
+    proxies.forEach(([proxyId, targetId]) => {
+        const proxy = document.getElementById(proxyId);
+        const target = document.getElementById(targetId);
+        if (proxy && target) proxy.addEventListener('click', () => target.click());
+    });
+
+    // Leaving mobile with the editor open would strand the slider in the
+    // hidden panel: put everything back before the desktop layout shows.
+    if (mq.addEventListener) {
+        mq.addEventListener('change', () => {
+            if (!mq.matches) {
+                if (activeSlider) closeEditor(true);
+                setMode('root');
+            }
+        });
     }
-    carousel.addEventListener('scroll', () => requestAnimationFrame(update));
-    update();
+
+    window.addEventListener('resize', debounce(() => setMode(panel.dataset.mode), 150));
+    window.addEventListener('orientationchange', () => setTimeout(() => setMode(panel.dataset.mode), 350));
+    setMode('root');
 }
 
 // Tap anywhere on the empty preview to open the file picker
@@ -169,6 +252,26 @@ function setupTapToUpload(previewContainer, imageInput) {
         if (!originalImage) {
             imageInput.click();
         }
+    });
+}
+
+// Tiny square thumbnail for a chip: painting the full-size textures as
+// chip backgrounds is what made the panel feel sluggish on mobile.
+function setChipThumb(chip, src) {
+    loadOptimizedTexture(src).then(texture => {
+        const img = texture.preview;
+        const paint = () => {
+            const size = 120;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            const crop = Math.min(img.width, img.height);
+            ctx.drawImage(img, (img.width - crop) / 2, (img.height - crop) / 2, crop, crop, 0, 0, size, size);
+            chip.style.backgroundImage = `url("${canvas.toDataURL('image/jpeg', 0.75)}")`;
+        };
+        if (img.complete && img.width) paint();
+        else img.addEventListener('load', paint, { once: true });
     });
 }
 
@@ -184,7 +287,7 @@ function buildTextureChips(select) {
         chip.dataset.value = opt.value;
         chip.setAttribute('aria-pressed', String(opt.value === select.value));
         chip.setAttribute('aria-label', opt.text);
-        chip.style.backgroundImage = `url("${opt.value}")`;
+        setChipThumb(chip, opt.value);
         const num = document.createElement('span');
         num.textContent = opt.text.replace('Collodion-', '');
         chip.appendChild(num);
@@ -207,92 +310,6 @@ function buildTextureChips(select) {
             }
         });
     });
-}
-
-// Mobile bottom sheet: sliders always visible, drag up to reveal the rest
-function setupBottomSheet() {
-    const sheet = document.getElementById('controls-panel');
-    const handle = document.getElementById('sheet-handle');
-    const scrim = document.getElementById('sheet-scrim');
-    const slidersSection = document.getElementById('sheet-sliders');
-    const dotsSection = document.getElementById('slider-dots');
-    const moreSection = document.getElementById('sheet-more');
-    if (!sheet || !handle || !scrim || !slidersSection || !moreSection) return;
-
-    const mq = window.matchMedia('(max-width: 900px)');
-    let expanded = false;
-
-    function peekHeight() {
-        return handle.offsetHeight + slidersSection.offsetHeight
-            + (dotsSection ? dotsSection.offsetHeight : 0);
-    }
-
-    function measure() {
-        if (!mq.matches) {
-            document.documentElement.style.removeProperty('--sheet-peek');
-            moreSection.inert = false;
-            return;
-        }
-        document.documentElement.style.setProperty('--sheet-peek', peekHeight() + 'px');
-        moreSection.inert = !expanded;
-    }
-
-    function setExpanded(value) {
-        expanded = value;
-        sheet.classList.toggle('expanded', expanded);
-        scrim.classList.toggle('visible', expanded);
-        handle.setAttribute('aria-expanded', String(expanded));
-        moreSection.inert = mq.matches && !expanded;
-        if (!expanded) sheet.scrollTop = 0;
-    }
-
-    let dragging = false;
-    let startY = 0;
-    let startOffset = 0;
-    let currentOffset = 0;
-    let maxOffset = 0;
-
-    handle.addEventListener('pointerdown', (e) => {
-        if (!mq.matches) return;
-        dragging = true;
-        startY = e.clientY;
-        maxOffset = Math.max(0, sheet.offsetHeight - peekHeight());
-        startOffset = expanded ? 0 : maxOffset;
-        currentOffset = startOffset;
-        sheet.classList.add('dragging');
-        handle.setPointerCapture(e.pointerId);
-    });
-
-    handle.addEventListener('pointermove', (e) => {
-        if (!dragging) return;
-        currentOffset = Math.min(maxOffset, Math.max(0, startOffset + (e.clientY - startY)));
-        sheet.style.transform = `translateY(${currentOffset}px)`;
-    });
-
-    function endDrag(e, cancelled) {
-        if (!dragging) return;
-        dragging = false;
-        sheet.classList.remove('dragging');
-        sheet.style.transform = '';
-        if (cancelled) {
-            setExpanded(expanded);
-        } else if (Math.abs(e.clientY - startY) < 6) {
-            setExpanded(!expanded); // treated as a tap
-        } else {
-            setExpanded(currentOffset < maxOffset / 2); // snap to nearest state
-        }
-    }
-
-    handle.addEventListener('pointerup', (e) => endDrag(e, false));
-    handle.addEventListener('pointercancel', (e) => endDrag(e, true));
-
-    scrim.addEventListener('click', () => setExpanded(false));
-
-    window.addEventListener('resize', debounce(measure, 150));
-    window.addEventListener('orientationchange', () => setTimeout(measure, 350));
-    if (mq.addEventListener) mq.addEventListener('change', measure);
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
-    measure();
 }
 
 function setupDragAndDrop(previewContainer) {
