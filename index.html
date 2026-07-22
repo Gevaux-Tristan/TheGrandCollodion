@@ -64,11 +64,11 @@
       </div>
       <div class="m-settings">
         <div class="m-settings-row">
-          <button type="button" data-slider="contrast"><span class="material-icon">tonality</span>Contrast</button>
-          <button type="button" data-slider="opacity"><span class="material-icon">opacity</span>Opacity</button>
-          <button type="button" data-slider="grain"><span class="material-icon">grain</span>Grain</button>
           <button type="button" data-slider="exposure"><span class="material-icon">exposure</span>Exposure</button>
+          <button type="button" data-slider="contrast"><span class="material-icon">tonality</span>Contrast</button>
+          <button type="button" data-slider="grain"><span class="material-icon">grain</span>Grain</button>
           <button type="button" data-slider="radialBlur"><span class="material-icon">blur_on</span>Blur</button>
+          <button type="button" data-slider="opacity"><span class="material-icon">opacity</span>Opacity</button>
         </div>
         <div class="m-actions">
           <button type="button" id="m-set-cancel" aria-label="Close"><span class="material-icon">close</span></button>
@@ -100,17 +100,17 @@
       <div id="sheet-sliders">
         <div class="control">
           <div class="control-head">
+            <label for="exposure">Exposure</label>
+            <output for="exposure" data-slider="exposure"></output>
+          </div>
+          <input type="range" id="exposure" min="-2" max="2" step="0.1" value="0" />
+        </div>
+        <div class="control">
+          <div class="control-head">
             <label for="contrast">Contrast</label>
             <output for="contrast" data-slider="contrast"></output>
           </div>
           <input type="range" id="contrast" min="0" max="5" step="0.1" value="2.4" />
-        </div>
-        <div class="control">
-          <div class="control-head">
-            <label for="opacity">Texture opacity</label>
-            <output for="opacity" data-slider="opacity"></output>
-          </div>
-          <input type="range" id="opacity" min="0" max="1" step="0.01" value="0.55" />
         </div>
         <div class="control">
           <div class="control-head">
@@ -121,17 +121,17 @@
         </div>
         <div class="control">
           <div class="control-head">
-            <label for="exposure">Exposure</label>
-            <output for="exposure" data-slider="exposure"></output>
-          </div>
-          <input type="range" id="exposure" min="-2" max="2" step="0.1" value="0" />
-        </div>
-        <div class="control">
-          <div class="control-head">
             <label for="radialBlur">Radial Blur</label>
             <output for="radialBlur" data-slider="radialBlur"></output>
           </div>
           <input type="range" id="radialBlur" min="0" max="5" step="0.1" value="0" />
+        </div>
+        <div class="control">
+          <div class="control-head">
+            <label for="opacity">Texture opacity</label>
+            <output for="opacity" data-slider="opacity"></output>
+          </div>
+          <input type="range" id="opacity" min="0" max="1" step="0.01" value="0.55" />
         </div>
       </div>
       <div id="sheet-more">
