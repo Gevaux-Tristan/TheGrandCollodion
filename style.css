@@ -504,22 +504,21 @@ input[type="range"]::-moz-range-track {
 
   #mobile-panel > div { display: none; }
 
-  #mobile-panel[data-mode="root"] .m-root {
-    display: flex;
-  }
-
+  #mobile-panel[data-mode="root"] .m-root,
   #mobile-panel[data-mode="settings"] .m-settings,
   #mobile-panel[data-mode="editor"] .m-editor,
   #mobile-panel[data-mode="texture"] .m-texture {
     display: block;
   }
 
-  .m-root {
+  .m-root-row {
+    display: flex;
     justify-content: center;
     gap: 56px;
+    padding-top: 4px;
   }
 
-  .m-root button,
+  .m-root-row button,
   .m-settings-row button {
     display: flex;
     flex-direction: column;
@@ -538,7 +537,7 @@ input[type="range"]::-moz-range-track {
     cursor: pointer;
   }
 
-  .m-root .material-icon,
+  .m-root-row .material-icon,
   .m-settings-row .material-icon {
     margin-right: 0;
     font-size: 26px;
@@ -611,12 +610,14 @@ input[type="range"]::-moz-range-track {
 
   #m-cancel .material-icon,
   #m-set-cancel .material-icon,
+  #m-root-cancel .material-icon,
   #m-tex-cancel .material-icon {
     color: #8a8a8a;
   }
 
   #m-apply .material-icon,
   #m-set-apply .material-icon,
+  #m-root-apply .material-icon,
   #m-tex-apply .material-icon {
     color: #FFBF00;
   }
