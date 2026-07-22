@@ -166,7 +166,6 @@ function initializeApp() {
     loadOptimizedTexture("Collodion-01.jpg").then(texture => {
         textureImage = texture.preview;
     });
-    elements.opacitySlider.value = "0.75";
 
     // Configurer les event listeners
     setupDragAndDrop(elements.previewContainer);

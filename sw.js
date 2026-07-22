@@ -1,10 +1,11 @@
 // Offline support. Strategy:
 // - install: precache the small app shell
-// - navigations: network-first, cache fallback (works offline, fresh when online)
-// - CSS/JS: stale-while-revalidate (updates land one reload later)
+// - navigations AND same-origin CSS/JS: network-first, cache fallback.
+//   Code must never lag behind the HTML that references it (stale JS next
+//   to fresh HTML broke the Cadre feature), so no stale-while-revalidate.
 // - textures, images, fonts (incl. Google Fonts): cache-first, cached on first use
 // The app preloads every texture at startup, so one online visit fills the cache.
-const CACHE_VERSION = 'collodion-v4';
+const CACHE_VERSION = 'collodion-v5';
 const SHELL_CACHE = CACHE_VERSION + '-shell';
 const RUNTIME_CACHE = CACHE_VERSION + '-runtime';
 
@@ -63,19 +64,18 @@ self.addEventListener('fetch', event => {
   const isCode = isSameOrigin && /\.(css|js)$/.test(url.pathname);
 
   if (isCode) {
-    // Stale-while-revalidate: serve cached immediately, refresh in background
+    // Network-first: code stays in lockstep with the HTML; cache is the
+    // offline fallback only
     event.respondWith(
-      caches.open(SHELL_CACHE).then(cache =>
-        cache.match(request).then(cached => {
-          const refresh = fetch(request)
-            .then(response => {
-              if (response && response.ok) cache.put(request, response.clone());
-              return response;
-            })
-            .catch(() => cached);
-          return cached || refresh;
+      fetch(request)
+        .then(response => {
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(SHELL_CACHE).then(cache => cache.put(request, copy));
+          }
+          return response;
         })
-      )
+        .catch(() => caches.match(request))
     );
     return;
   }

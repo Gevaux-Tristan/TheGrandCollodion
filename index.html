@@ -58,10 +58,6 @@
           <button type="button" data-open="settings"><span class="material-icon">tune</span>Réglages</button>
           <button type="button" data-open="frame"><span class="material-icon">crop_portrait</span>Cadre</button>
         </div>
-        <div class="m-actions">
-          <button type="button" id="m-root-cancel" aria-label="Close"><span class="material-icon">close</span></button>
-          <button type="button" id="m-root-apply" aria-label="Done"><span class="material-icon">check</span></button>
-        </div>
       </div>
       <div class="m-settings">
         <div class="m-settings-row">
@@ -111,14 +107,14 @@
             <label for="exposure">Exposure</label>
             <output for="exposure" data-slider="exposure"></output>
           </div>
-          <input type="range" id="exposure" min="-2" max="2" step="0.1" value="0" />
+          <input type="range" id="exposure" min="-2" max="2" step="0.1" value="0.5" />
         </div>
         <div class="control">
           <div class="control-head">
             <label for="contrast">Contrast</label>
             <output for="contrast" data-slider="contrast"></output>
           </div>
-          <input type="range" id="contrast" min="0" max="5" step="0.1" value="2.4" />
+          <input type="range" id="contrast" min="0" max="5" step="0.1" value="1" />
         </div>
         <div class="control">
           <div class="control-head">
@@ -139,7 +135,7 @@
             <label for="opacity">Texture opacity</label>
             <output for="opacity" data-slider="opacity"></output>
           </div>
-          <input type="range" id="opacity" min="0" max="1" step="0.01" value="0.55" />
+          <input type="range" id="opacity" min="0" max="1" step="0.01" value="0.5" />
         </div>
       </div>
       <div id="sheet-more">

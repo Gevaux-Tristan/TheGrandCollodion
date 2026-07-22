@@ -687,14 +687,12 @@ input[type="range"]::-moz-range-track {
 
   #m-cancel .material-icon,
   #m-set-cancel .material-icon,
-  #m-root-cancel .material-icon,
   #m-tex-cancel .material-icon {
     color: #8a8a8a;
   }
 
   #m-apply .material-icon,
   #m-set-apply .material-icon,
-  #m-root-apply .material-icon,
   #m-tex-apply .material-icon {
     color: #FFBF00;
   }
