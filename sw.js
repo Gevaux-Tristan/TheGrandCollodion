@@ -5,15 +5,15 @@
 //   to fresh HTML broke the Cadre feature), so no stale-while-revalidate.
 // - textures, images, fonts (incl. Google Fonts): cache-first, cached on first use
 // The app preloads every texture at startup, so one online visit fills the cache.
-const CACHE_VERSION = 'collodion-v5';
+const CACHE_VERSION = 'collodion-v6';
 const SHELL_CACHE = CACHE_VERSION + '-shell';
 const RUNTIME_CACHE = CACHE_VERSION + '-runtime';
 
 const SHELL_ASSETS = [
   './',
   './index.html',
-  './style.css',
-  './script.js',
+  './style.css?v=6',
+  './script.js?v=6',
   './logo.svg',
   './manifest.json',
   './favicon.png',
