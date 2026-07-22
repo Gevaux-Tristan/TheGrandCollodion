@@ -107,8 +107,60 @@ function initializeApp() {
     setupDownloadButton(elements.downloadButton, elements.canvas);
     setupTextureSelect(elements.textureSelect);
     buildTextureChips(elements.textureSelect);
+    setupSliderValues();
+    setupSliderCarousel();
     setupBottomSheet();
     setupTapToUpload(elements.previewContainer, elements.imageInput);
+}
+
+// Live value readouts next to each slider label
+const SLIDER_FORMATTERS = {
+    contrast: v => v.toFixed(1),
+    opacity: v => Math.round(v * 100) + '%',
+    exposure: v => (v > 0 ? '+' : '') + v.toFixed(1),
+    radialBlur: v => v.toFixed(1)
+};
+
+function setupSliderValues() {
+    document.querySelectorAll('output[data-slider]').forEach(output => {
+        const slider = document.getElementById(output.dataset.slider);
+        if (!slider) return;
+        const format = SLIDER_FORMATTERS[output.dataset.slider] || (v => String(v));
+        const update = () => { output.textContent = format(parseFloat(slider.value)); };
+        slider.addEventListener('input', update);
+        update();
+    });
+}
+
+// Mobile: one setting per page; dots reflect and drive the carousel
+function setupSliderCarousel() {
+    const carousel = document.getElementById('sheet-sliders');
+    const dots = document.getElementById('slider-dots');
+    if (!carousel || !dots) return;
+
+    Array.from(carousel.children).forEach((page, index) => {
+        const dot = document.createElement('button');
+        dot.type = 'button';
+        dot.className = 'slider-dot';
+        const label = page.querySelector('label');
+        dot.setAttribute('aria-label', label ? label.textContent : 'Setting ' + (index + 1));
+        dot.addEventListener('click', () => {
+            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            carousel.scrollTo({
+                left: index * carousel.clientWidth,
+                behavior: reduceMotion ? 'auto' : 'smooth'
+            });
+        });
+        dots.appendChild(dot);
+    });
+
+    const dotButtons = Array.from(dots.children);
+    function update() {
+        const index = Math.round(carousel.scrollLeft / Math.max(1, carousel.clientWidth));
+        dotButtons.forEach((dot, i) => dot.classList.toggle('active', i === index));
+    }
+    carousel.addEventListener('scroll', () => requestAnimationFrame(update));
+    update();
 }
 
 // Tap anywhere on the empty preview to open the file picker
@@ -163,6 +215,7 @@ function setupBottomSheet() {
     const handle = document.getElementById('sheet-handle');
     const scrim = document.getElementById('sheet-scrim');
     const slidersSection = document.getElementById('sheet-sliders');
+    const dotsSection = document.getElementById('slider-dots');
     const moreSection = document.getElementById('sheet-more');
     if (!sheet || !handle || !scrim || !slidersSection || !moreSection) return;
 
@@ -170,7 +223,8 @@ function setupBottomSheet() {
     let expanded = false;
 
     function peekHeight() {
-        return handle.offsetHeight + slidersSection.offsetHeight;
+        return handle.offsetHeight + slidersSection.offsetHeight
+            + (dotsSection ? dotsSection.offsetHeight : 0);
     }
 
     function measure() {

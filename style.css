@@ -132,6 +132,7 @@ body {
 #sheet-handle,
 #sheet-scrim,
 #texture-chips,
+#slider-dots,
 .mobile-only {
   display: none;
 }
@@ -245,6 +246,20 @@ body {
 
 .control label {
   font-size: 13px;
+}
+
+.control-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  width: 100%;
+}
+
+.control-head output {
+  font-size: 12px;
+  font-weight: bold;
+  color: #FFBF00;
+  font-variant-numeric: tabular-nums;
 }
 
 input[type="range"] {
@@ -503,33 +518,86 @@ input[type="range"]::-moz-range-track {
     background: #FFBF00;
   }
 
-  /* Always-visible sliders, 2x2. Bottom padding doubles as the collapsed
-     sheet's safe-area spacing, since the sheet's own bottom edge sits
-     off-screen while collapsed. */
+  /* Always-visible settings: one per page, swipe sideways to change.
+     Only the thumb adjusts the slider; the rest of the row pans the
+     carousel (the track already ignores pointer events). */
   #sheet-sliders {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px 24px;
-    padding-bottom: max(20px, env(safe-area-inset-bottom));
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+
+  #sheet-sliders::-webkit-scrollbar {
+    display: none;
   }
 
   #sheet-sliders .control {
-    gap: 9px;
+    flex: 0 0 100%;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    gap: 12px;
+    padding: 0 2px;
   }
 
   .control label {
-    font-size: 12px;
+    font-size: 13px;
     color: #bfbfbf;
   }
 
+  .control-head output {
+    font-size: 13px;
+  }
+
+  input[type="range"] {
+    touch-action: none;
+  }
+
   input[type="range"]::-webkit-slider-thumb {
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
   }
 
   input[type="range"]::-moz-range-thumb {
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
+  }
+
+  /* Dots: one per setting. Bottom padding doubles as the collapsed
+     sheet's safe-area spacing, since the sheet's own bottom edge sits
+     off-screen while collapsed. */
+  #slider-dots {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+
+  .slider-dot {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+  }
+
+  .slider-dot::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #4a4a4a;
+    transition: background 0.2s ease-out, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .slider-dot.active::before {
+    background: #FFBF00;
+    transform: scale(1.3);
   }
 
   /* Expandable section */
@@ -612,13 +680,6 @@ input[type="range"]::-moz-range-track {
   }
 }
 
-/* Short landscape phones: one row of sliders */
-@media (max-width: 900px) and (max-height: 500px) {
-  #sheet-sliders {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
 /* ===== Reduced motion ===== */
 
 @media (prefers-reduced-motion: reduce) {
@@ -631,8 +692,13 @@ input[type="range"]::-moz-range-track {
   .texture-chip,
   .upload-label,
   #download,
+  .slider-dot::before,
   input[type="range"]::-webkit-slider-thumb {
     transition: none;
+  }
+
+  #sheet-sliders {
+    scroll-behavior: auto;
   }
 
   .texture-chip:active,

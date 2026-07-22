@@ -54,22 +54,35 @@
       <img src="logo.svg" alt="The Grand Collodion Logo" id="logo" />
       <div id="sheet-sliders">
         <div class="control">
-          <label for="contrast">Contrast</label>
+          <div class="control-head">
+            <label for="contrast">Contrast</label>
+            <output for="contrast" data-slider="contrast"></output>
+          </div>
           <input type="range" id="contrast" min="0" max="5" step="0.1" value="2.4" />
         </div>
         <div class="control">
-          <label for="opacity">Texture opacity</label>
+          <div class="control-head">
+            <label for="opacity">Texture opacity</label>
+            <output for="opacity" data-slider="opacity"></output>
+          </div>
           <input type="range" id="opacity" min="0" max="1" step="0.01" value="0.55" />
         </div>
         <div class="control">
-          <label for="exposure">Exposure</label>
+          <div class="control-head">
+            <label for="exposure">Exposure</label>
+            <output for="exposure" data-slider="exposure"></output>
+          </div>
           <input type="range" id="exposure" min="-2" max="2" step="0.1" value="0" />
         </div>
         <div class="control">
-          <label for="radialBlur">Radial Blur</label>
+          <div class="control-head">
+            <label for="radialBlur">Radial Blur</label>
+            <output for="radialBlur" data-slider="radialBlur"></output>
+          </div>
           <input type="range" id="radialBlur" min="0" max="5" step="0.1" value="0" />
         </div>
       </div>
+      <div id="slider-dots" aria-label="Settings"></div>
       <div id="sheet-more">
       <div class="control" id="texture-control">
         <label for="texture">Choose your texture</label>
