@@ -227,7 +227,8 @@ function setupMobilePanel() {
         });
     });
 
-    panel.querySelector('.m-back').addEventListener('click', () => setMode('root'));
+    document.getElementById('m-set-cancel').addEventListener('click', () => setMode('root'));
+    document.getElementById('m-set-apply').addEventListener('click', () => setMode('root'));
 
     panel.querySelectorAll('.m-settings [data-slider]').forEach(btn => {
         btn.addEventListener('click', () => openSlider(btn.dataset.slider));

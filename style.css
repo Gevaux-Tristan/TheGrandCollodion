@@ -504,11 +504,11 @@ input[type="range"]::-moz-range-track {
 
   #mobile-panel > div { display: none; }
 
-  #mobile-panel[data-mode="root"] .m-root,
-  #mobile-panel[data-mode="settings"] .m-settings {
+  #mobile-panel[data-mode="root"] .m-root {
     display: flex;
   }
 
+  #mobile-panel[data-mode="settings"] .m-settings,
   #mobile-panel[data-mode="editor"] .m-editor,
   #mobile-panel[data-mode="texture"] .m-texture {
     display: block;
@@ -520,7 +520,7 @@ input[type="range"]::-moz-range-track {
   }
 
   .m-root button,
-  .m-settings button {
+  .m-settings-row button {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -539,30 +539,27 @@ input[type="range"]::-moz-range-track {
   }
 
   .m-root .material-icon,
-  .m-settings .material-icon {
+  .m-settings-row .material-icon {
     margin-right: 0;
     font-size: 26px;
     color: #FFBF00;
   }
 
-  .m-settings {
+  .m-settings-row {
+    display: flex;
     align-items: stretch;
     justify-content: space-between;
     gap: 0;
+    padding-top: 4px;
   }
 
-  /* Five settings plus the back button: let items shrink on narrow phones */
-  .m-settings [data-slider] {
+  /* Five settings share the row: let items shrink on narrow phones */
+  .m-settings-row [data-slider] {
     flex: 1 1 0;
     min-width: 0;
     padding: 6px 2px;
     font-size: 11px;
     white-space: nowrap;
-  }
-
-  .m-settings .m-back {
-    flex: 0 0 44px;
-    min-width: 44px;
   }
 
   .m-settings .m-back .material-icon {
@@ -613,11 +610,13 @@ input[type="range"]::-moz-range-track {
   }
 
   #m-cancel .material-icon,
+  #m-set-cancel .material-icon,
   #m-tex-cancel .material-icon {
     color: #8a8a8a;
   }
 
   #m-apply .material-icon,
+  #m-set-apply .material-icon,
   #m-tex-apply .material-icon {
     color: #FFBF00;
   }

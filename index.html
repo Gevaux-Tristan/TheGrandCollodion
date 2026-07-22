@@ -54,15 +54,20 @@
     <div id="mobile-panel" data-mode="root">
       <div class="m-root">
         <button type="button" data-open="texture"><span class="material-icon">texture</span>Texture</button>
-        <button type="button" data-open="settings"><span class="material-icon">tune</span>Adjust</button>
+        <button type="button" data-open="settings"><span class="material-icon">tune</span>Réglages</button>
       </div>
       <div class="m-settings">
-        <button type="button" class="m-back" aria-label="Back"><span class="material-icon">close</span></button>
-        <button type="button" data-slider="contrast"><span class="material-icon">tonality</span>Contrast</button>
-        <button type="button" data-slider="opacity"><span class="material-icon">opacity</span>Opacity</button>
-        <button type="button" data-slider="grain"><span class="material-icon">grain</span>Grain</button>
-        <button type="button" data-slider="exposure"><span class="material-icon">exposure</span>Exposure</button>
-        <button type="button" data-slider="radialBlur"><span class="material-icon">blur_on</span>Blur</button>
+        <div class="m-settings-row">
+          <button type="button" data-slider="contrast"><span class="material-icon">tonality</span>Contrast</button>
+          <button type="button" data-slider="opacity"><span class="material-icon">opacity</span>Opacity</button>
+          <button type="button" data-slider="grain"><span class="material-icon">grain</span>Grain</button>
+          <button type="button" data-slider="exposure"><span class="material-icon">exposure</span>Exposure</button>
+          <button type="button" data-slider="radialBlur"><span class="material-icon">blur_on</span>Blur</button>
+        </div>
+        <div class="m-actions">
+          <button type="button" id="m-set-cancel" aria-label="Close"><span class="material-icon">close</span></button>
+          <button type="button" id="m-set-apply" aria-label="Done"><span class="material-icon">check</span></button>
+        </div>
       </div>
       <div class="m-editor">
         <div class="m-editor-head">
