@@ -30,7 +30,7 @@
   <meta name="twitter:description" content="Transform your photos into beautiful collodion-style images with this interactive web tool." />
   <meta name="twitter:image" content="https://tristangevaux.github.io/TheGrandCollodion/og-image.png" />
   
-  <link rel="stylesheet" href="style.css?v=6" />
+  <link rel="stylesheet" href="style.css?v=7" />
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <link rel="icon" href="favicon.png" type="image/png" />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
@@ -43,6 +43,14 @@
         <span class="material-icon">add_photo_alternate</span>
         <p class="desktop-only">Drag &amp; drop or click to add your image</p>
         <p class="mobile-only">Tap to add your photo</p>
+      </div>
+      <div id="crop-overlay">
+        <div id="crop-box">
+          <div class="crop-handle" data-corner="nw"></div>
+          <div class="crop-handle" data-corner="ne"></div>
+          <div class="crop-handle" data-corner="sw"></div>
+          <div class="crop-handle" data-corner="se"></div>
+        </div>
       </div>
     </div>
     <div id="mobile-topbar">
@@ -57,6 +65,7 @@
           <button type="button" data-open="texture"><span class="material-icon">texture</span>Texture</button>
           <button type="button" data-open="settings"><span class="material-icon">tune</span>Réglages</button>
           <button type="button" data-open="frame"><span class="material-icon">crop_portrait</span>Cadre</button>
+          <button type="button" data-open="crop"><span class="material-icon">crop</span>Recadrer</button>
         </div>
       </div>
       <div class="m-settings">
@@ -95,6 +104,13 @@
         <div class="m-actions">
           <button type="button" id="m-frame-cancel" aria-label="Cancel"><span class="material-icon">close</span></button>
           <button type="button" id="m-frame-apply" aria-label="Apply"><span class="material-icon">check</span></button>
+        </div>
+      </div>
+      <div class="m-crop">
+        <div id="m-crop-slot"></div>
+        <div class="m-actions">
+          <button type="button" id="m-crop-cancel" aria-label="Cancel"><span class="material-icon">close</span></button>
+          <button type="button" id="m-crop-apply" aria-label="Apply"><span class="material-icon">check</span></button>
         </div>
       </div>
     </div>
@@ -244,6 +260,32 @@
         </div>
         <input type="range" id="frameScale" min="0.5" max="1" step="0.01" value="1" />
       </div>
+      <div class="control" id="crop-control">
+        <button type="button" id="crop-enter"><span class="material-icon">crop</span>Recadrer l'image</button>
+        <div id="crop-tools">
+          <div id="crop-ratios" role="group" aria-label="Ratio">
+            <button type="button" data-ratio="free" aria-pressed="true">Libre</button>
+            <button type="button" data-ratio="4:5" aria-pressed="false">4:5</button>
+            <button type="button" data-ratio="5:4" aria-pressed="false">5:4</button>
+            <button type="button" data-ratio="3:2" aria-pressed="false">3:2</button>
+            <button type="button" data-ratio="2:3" aria-pressed="false">2:3</button>
+            <button type="button" data-ratio="9:16" aria-pressed="false">9:16</button>
+            <button type="button" data-ratio="16:9" aria-pressed="false">16:9</button>
+          </div>
+          <div class="control-head">
+            <label for="straighten">Redresser</label>
+            <output id="straighten-value">0.0°</output>
+          </div>
+          <div id="straighten-row">
+            <button type="button" id="straighten-auto" aria-label="Redresser automatiquement"><span class="material-icon">auto_fix_high</span></button>
+            <input type="range" id="straighten" min="-15" max="15" step="0.1" value="0" />
+          </div>
+          <div id="crop-desktop-actions">
+            <button type="button" id="crop-cancel-desktop">Annuler</button>
+            <button type="button" id="crop-apply-desktop">Valider</button>
+          </div>
+        </div>
+      </div>
       <div id="sheet-actions">
         <label class="upload-label">
           <input type="file" id="upload" accept="image/*" />
@@ -258,6 +300,6 @@
       </div>
     </div>
   </div>
-  <script src="script.js?v=6"></script>
+  <script src="script.js?v=7"></script>
 </body>
 </html>

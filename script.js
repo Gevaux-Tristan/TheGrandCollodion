@@ -1,5 +1,9 @@
 // Variables globales
-let originalImage = null;
+let originalImage = null;   // working image: source with crop/straighten applied
+let sourceImage = null;     // pristine upload, crop re-edits start from here
+let appliedCrop = null;     // { angle, ratio, rect } or null for full image
+// live crop-editing state; rect is normalized to the rotated bounding box
+const cropEdit = { active: false, angle: 0, ratio: 'free', rect: { x: 0, y: 0, w: 1, h: 1 } };
 let textureImage = new Image();
 let isProcessing = false;
 let needsUpdate = false;
@@ -180,6 +184,7 @@ function initializeApp() {
     setupMobilePanel();
     setupTapToUpload(elements.previewContainer, elements.imageInput);
     setupBlurFocus(elements.previewContainer, elements.canvas);
+    setupCropTool(elements.previewContainer, elements.canvas);
 }
 
 // Tap or drag on the loaded photo. Default: place the radial blur focus
@@ -255,7 +260,7 @@ function setupBlurFocus(previewContainer, canvas) {
     }
 
     previewContainer.addEventListener('pointerdown', (e) => {
-        if (!originalImage) return;
+        if (!originalImage || cropEdit.active) return;
         dragging = true;
         isSliding = true;
         dragMode = dragTarget();
@@ -282,6 +287,382 @@ function setupBlurFocus(previewContainer, canvas) {
     // Adjusting the blur slider also reveals where the focus point sits
     const blurSlider = document.getElementById('radialBlur');
     if (blurSlider) blurSlider.addEventListener('input', showReticle);
+}
+
+// ===== Crop & straighten =====
+// The working image is re-derived from the pristine source each time the
+// crop is applied, so re-opening the tool is non-destructive.
+
+function cropRatioPx() {
+    if (cropEdit.ratio === 'free') return null;
+    const [a, b] = cropEdit.ratio.split(':').map(Number);
+    return a / b;
+}
+
+function boundingBoxFor(angle) {
+    const rad = angle * Math.PI / 180;
+    const cos = Math.abs(Math.cos(rad));
+    const sin = Math.abs(Math.sin(rad));
+    return {
+        w: sourceImage.width * cos + sourceImage.height * sin,
+        h: sourceImage.width * sin + sourceImage.height * cos
+    };
+}
+
+// Largest axis-aligned rectangle fully inside the rotated source
+function largestInscribed(w, h, rad) {
+    const sinA = Math.abs(Math.sin(rad));
+    const cosA = Math.abs(Math.cos(rad));
+    if (sinA < 1e-6) return { w, h };
+    const widthIsLonger = w >= h;
+    const longSide = widthIsLonger ? w : h;
+    const shortSide = widthIsLonger ? h : w;
+    if (shortSide <= 2 * sinA * cosA * longSide || Math.abs(sinA - cosA) < 1e-10) {
+        const x = 0.5 * shortSide;
+        return widthIsLonger ? { w: x / sinA, h: x / cosA } : { w: x / cosA, h: x / sinA };
+    }
+    const cos2A = cosA * cosA - sinA * sinA;
+    return { w: (w * cosA - h * sinA) / cos2A, h: (h * cosA - w * sinA) / cos2A };
+}
+
+// Allowed crop bounds (normalized, centered) so the crop never contains
+// empty corners introduced by the rotation
+function cropBounds() {
+    if (!cropEdit.angle) return { x: 0, y: 0, w: 1, h: 1 };
+    const rad = cropEdit.angle * Math.PI / 180;
+    const ins = largestInscribed(sourceImage.width, sourceImage.height, rad);
+    const bb = boundingBoxFor(cropEdit.angle);
+    return {
+        x: (bb.w - ins.w) / 2 / bb.w,
+        y: (bb.h - ins.h) / 2 / bb.h,
+        w: ins.w / bb.w,
+        h: ins.h / bb.h
+    };
+}
+
+function clampNum(v, lo, hi) {
+    return Math.min(hi, Math.max(lo, v));
+}
+
+// Recompute the crop rect after an angle or ratio change: keep the
+// center, honor the locked ratio, stay inside the allowed bounds
+function refitCropRect() {
+    const bounds = cropBounds();
+    const bb = boundingBoxFor(cropEdit.angle);
+    const ratio = cropRatioPx();
+    let { x, y, w, h } = cropEdit.rect;
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    if (ratio) {
+        let pw = Math.min(w * bb.w, bounds.w * bb.w);
+        let ph = pw / ratio;
+        if (ph > bounds.h * bb.h) {
+            ph = bounds.h * bb.h;
+            pw = ph * ratio;
+        }
+        w = pw / bb.w;
+        h = ph / bb.h;
+    } else {
+        w = Math.min(w, bounds.w);
+        h = Math.min(h, bounds.h);
+    }
+    x = clampNum(cx - w / 2, bounds.x, bounds.x + bounds.w - w);
+    y = clampNum(cy - h / 2, bounds.y, bounds.y + bounds.h - h);
+    cropEdit.rect = { x, y, w, h };
+}
+
+// Fill the ratio at maximum size when the user picks a chip
+function fitCropToRatio() {
+    const bounds = cropBounds();
+    const bb = boundingBoxFor(cropEdit.angle);
+    const ratio = cropRatioPx();
+    if (!ratio) return;
+    let pw = bounds.w * bb.w;
+    let ph = pw / ratio;
+    if (ph > bounds.h * bb.h) {
+        ph = bounds.h * bb.h;
+        pw = ph * ratio;
+    }
+    const prev = cropEdit.rect;
+    const cx = prev.x + prev.w / 2;
+    const cy = prev.y + prev.h / 2;
+    const w = pw / bb.w;
+    const h = ph / bb.h;
+    cropEdit.rect = {
+        x: clampNum(cx - w / 2, bounds.x, bounds.x + bounds.w - w),
+        y: clampNum(cy - h / 2, bounds.y, bounds.y + bounds.h - h),
+        w, h
+    };
+}
+
+// Draw the rotated source on a canvas sized to its bounding box
+function renderRotatedSource(target) {
+    const bb = boundingBoxFor(cropEdit.angle);
+    target.width = Math.max(1, Math.round(bb.w));
+    target.height = Math.max(1, Math.round(bb.h));
+    const tctx = target.getContext('2d');
+    tctx.imageSmoothingEnabled = true;
+    tctx.imageSmoothingQuality = 'high';
+    tctx.translate(target.width / 2, target.height / 2);
+    tctx.rotate(cropEdit.angle * Math.PI / 180);
+    tctx.drawImage(sourceImage, -sourceImage.width / 2, -sourceImage.height / 2);
+    tctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+// Auto-straighten: histogram of edge orientations near horizontal or
+// vertical; the dominant deviation is the correction to apply
+function estimateAutoAngle() {
+    const size = 240;
+    const scale = Math.min(size / sourceImage.width, size / sourceImage.height, 1);
+    const w = Math.max(3, Math.round(sourceImage.width * scale));
+    const h = Math.max(3, Math.round(sourceImage.height * scale));
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    g.drawImage(sourceImage, 0, 0, w, h);
+    const d = g.getImageData(0, 0, w, h).data;
+    const lum = new Float32Array(w * h);
+    for (let i = 0; i < w * h; i++) {
+        lum[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+    }
+    const bins = new Float32Array(241); // -12° .. +12° by 0.1°
+    let total = 0;
+    for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+            const i = y * w + x;
+            const gx = lum[i + 1 - w] + 2 * lum[i + 1] + lum[i + 1 + w]
+                     - lum[i - 1 - w] - 2 * lum[i - 1] - lum[i - 1 + w];
+            const gy = lum[i + w - 1] + 2 * lum[i + w] + lum[i + w + 1]
+                     - lum[i - w - 1] - 2 * lum[i - w] - lum[i - w + 1];
+            const mag = Math.hypot(gx, gy);
+            if (mag < 120) continue;
+            const line = Math.atan2(gy, gx) * 180 / Math.PI + 90;
+            let dev = ((line % 90) + 90) % 90;
+            if (dev > 45) dev -= 90;
+            if (Math.abs(dev) <= 12) {
+                bins[Math.round((dev + 12) * 10)] += mag;
+                total += mag;
+            }
+        }
+    }
+    if (!total) return 0;
+    let best = 120;
+    let bestV = 0;
+    for (let k = 2; k <= 238; k++) {
+        const v = bins[k - 2] + bins[k - 1] + bins[k] + bins[k + 1] + bins[k + 2];
+        if (v > bestV) {
+            bestV = v;
+            best = k;
+        }
+    }
+    if (bestV < total * 0.05) return 0;
+    return clampNum(-(best / 10 - 12), -15, 15);
+}
+
+function setupCropTool(previewContainer, canvas) {
+    const overlay = document.getElementById('crop-overlay');
+    const box = document.getElementById('crop-box');
+    const straighten = document.getElementById('straighten');
+    const straightenOut = document.getElementById('straighten-value');
+    if (!overlay || !box || !straighten) return;
+
+    function updateStraightenOut() {
+        const v = parseFloat(straighten.value);
+        straightenOut.textContent = (v > 0 ? '+' : '') + v.toFixed(1) + '°';
+    }
+
+    function syncRatioChips() {
+        document.querySelectorAll('#crop-ratios button').forEach(b =>
+            b.setAttribute('aria-pressed', String(b.dataset.ratio === cropEdit.ratio)));
+    }
+
+    function renderCropPreview() {
+        renderRotatedSource(canvas);
+    }
+
+    function updateOverlay() {
+        const rect = canvas.getBoundingClientRect();
+        const parent = previewContainer.getBoundingClientRect();
+        overlay.style.left = (rect.left - parent.left) + 'px';
+        overlay.style.top = (rect.top - parent.top) + 'px';
+        overlay.style.width = rect.width + 'px';
+        overlay.style.height = rect.height + 'px';
+        const r = cropEdit.rect;
+        box.style.left = (r.x * rect.width) + 'px';
+        box.style.top = (r.y * rect.height) + 'px';
+        box.style.width = (r.w * rect.width) + 'px';
+        box.style.height = (r.h * rect.height) + 'px';
+    }
+
+    function refresh() {
+        renderCropPreview();
+        updateOverlay();
+    }
+
+    window.enterCropMode = function() {
+        if (!sourceImage) return false;
+        cropEdit.active = true;
+        if (appliedCrop) {
+            cropEdit.angle = appliedCrop.angle;
+            cropEdit.ratio = appliedCrop.ratio;
+            cropEdit.rect = Object.assign({}, appliedCrop.rect);
+        } else {
+            cropEdit.angle = 0;
+            cropEdit.ratio = 'free';
+            cropEdit.rect = { x: 0, y: 0, w: 1, h: 1 };
+        }
+        straighten.value = String(cropEdit.angle);
+        updateStraightenOut();
+        syncRatioChips();
+        document.body.classList.add('cropping');
+        refresh();
+        return true;
+    };
+
+    window.exitCropMode = function(apply) {
+        cropEdit.active = false;
+        document.body.classList.remove('cropping');
+        if (apply) {
+            const full = cropEdit.angle === 0 && cropEdit.rect.w > 0.999 && cropEdit.rect.h > 0.999;
+            if (full) {
+                appliedCrop = null;
+                setWorkingImage(sourceImage);
+            } else {
+                appliedCrop = {
+                    angle: cropEdit.angle,
+                    ratio: cropEdit.ratio,
+                    rect: Object.assign({}, cropEdit.rect)
+                };
+                const temp = document.createElement('canvas');
+                renderRotatedSource(temp);
+                const r = cropEdit.rect;
+                const out = document.createElement('canvas');
+                out.width = Math.max(1, Math.round(r.w * temp.width));
+                out.height = Math.max(1, Math.round(r.h * temp.height));
+                out.getContext('2d').drawImage(
+                    temp,
+                    Math.round(r.x * temp.width), Math.round(r.y * temp.height),
+                    out.width, out.height,
+                    0, 0, out.width, out.height
+                );
+                const img = new Image();
+                img.onload = () => setWorkingImage(img);
+                img.src = out.toDataURL('image/jpeg', 0.95);
+            }
+        } else {
+            applyPreviewEffects(true);
+        }
+    };
+
+    document.querySelectorAll('#crop-ratios button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            cropEdit.ratio = btn.dataset.ratio;
+            syncRatioChips();
+            if (cropEdit.ratio !== 'free') fitCropToRatio();
+            updateOverlay();
+        });
+    });
+
+    straighten.addEventListener('input', () => {
+        cropEdit.angle = parseFloat(straighten.value);
+        updateStraightenOut();
+        refitCropRect();
+        refresh();
+    });
+
+    const autoBtn = document.getElementById('straighten-auto');
+    if (autoBtn) {
+        autoBtn.addEventListener('click', () => {
+            straighten.value = String(estimateAutoAngle());
+            straighten.dispatchEvent(new Event('input'));
+        });
+    }
+
+    // Dragging: corners resize, inside moves
+    let drag = null;
+    overlay.addEventListener('pointerdown', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        if (!rect.width) return;
+        const handle = e.target.closest('.crop-handle');
+        const nx = (e.clientX - rect.left) / rect.width;
+        const ny = (e.clientY - rect.top) / rect.height;
+        const r = cropEdit.rect;
+        if (handle) {
+            drag = { mode: handle.dataset.corner, rect: Object.assign({}, r) };
+        } else if (nx >= r.x && nx <= r.x + r.w && ny >= r.y && ny <= r.y + r.h) {
+            drag = { mode: 'move', rect: Object.assign({}, r), startX: nx, startY: ny };
+        } else {
+            return;
+        }
+        overlay.setPointerCapture(e.pointerId);
+        e.preventDefault();
+    });
+
+    overlay.addEventListener('pointermove', (e) => {
+        if (!drag) return;
+        const rect = canvas.getBoundingClientRect();
+        const nx = (e.clientX - rect.left) / rect.width;
+        const ny = (e.clientY - rect.top) / rect.height;
+        const bounds = cropBounds();
+        if (drag.mode === 'move') {
+            const w = drag.rect.w;
+            const h = drag.rect.h;
+            cropEdit.rect = {
+                x: clampNum(drag.rect.x + (nx - drag.startX), bounds.x, bounds.x + bounds.w - w),
+                y: clampNum(drag.rect.y + (ny - drag.startY), bounds.y, bounds.y + bounds.h - h),
+                w, h
+            };
+        } else {
+            const bb = boundingBoxFor(cropEdit.angle);
+            const minN = 0.08;
+            const corner = drag.mode;
+            const ax = corner.includes('w') ? drag.rect.x + drag.rect.w : drag.rect.x;
+            const ay = corner.includes('n') ? drag.rect.y + drag.rect.h : drag.rect.y;
+            const mx = clampNum(nx, bounds.x, bounds.x + bounds.w);
+            const my = clampNum(ny, bounds.y, bounds.y + bounds.h);
+            let w = Math.max(minN, Math.abs(mx - ax));
+            let h = Math.max(minN, Math.abs(my - ay));
+            const sx = mx >= ax ? 1 : -1;
+            const sy = my >= ay ? 1 : -1;
+            const ratio = cropRatioPx();
+            if (ratio) {
+                let pw = w * bb.w;
+                let ph = h * bb.h;
+                if (pw / ratio >= ph) ph = pw / ratio; else pw = ph * ratio;
+                const maxW = (sx > 0 ? bounds.x + bounds.w - ax : ax - bounds.x) * bb.w;
+                const maxH = (sy > 0 ? bounds.y + bounds.h - ay : ay - bounds.y) * bb.h;
+                if (pw > maxW) { pw = maxW; ph = pw / ratio; }
+                if (ph > maxH) { ph = maxH; pw = ph * ratio; }
+                w = pw / bb.w;
+                h = ph / bb.h;
+            }
+            cropEdit.rect = {
+                x: sx > 0 ? ax : ax - w,
+                y: sy > 0 ? ay : ay - h,
+                w, h
+            };
+        }
+        updateOverlay();
+    });
+
+    function endCropDrag() {
+        drag = null;
+    }
+    overlay.addEventListener('pointerup', endCropDrag);
+    overlay.addEventListener('pointercancel', endCropDrag);
+
+    window.addEventListener('resize', debounce(() => {
+        if (cropEdit.active) updateOverlay();
+    }, 150));
+
+    // Desktop entry points (the mobile panel drives its own)
+    const enterBtn = document.getElementById('crop-enter');
+    if (enterBtn) enterBtn.addEventListener('click', () => window.enterCropMode());
+    const dCancel = document.getElementById('crop-cancel-desktop');
+    const dApply = document.getElementById('crop-apply-desktop');
+    if (dCancel) dCancel.addEventListener('click', () => window.exitCropMode(false));
+    if (dApply) dApply.addEventListener('click', () => window.exitCropMode(true));
 }
 
 // Frame background chips (Aucun / Blanc / Noir), shared by both layouts
@@ -345,6 +726,9 @@ function setupMobilePanel() {
     let frameHome = null;
     const frameControl = document.getElementById('frame-control');
     const frameSlot = document.getElementById('m-frame-slot');
+    let cropHome = null;
+    const cropTools = document.getElementById('crop-tools');
+    const cropSlot = document.getElementById('m-crop-slot');
 
     function setMode(mode) {
         panel.dataset.mode = mode;
@@ -410,6 +794,19 @@ function setupMobilePanel() {
         setMode('root');
     }
 
+    function openCrop() {
+        if (!window.enterCropMode || !window.enterCropMode()) return;
+        cropHome = { parent: cropTools.parentNode, next: cropTools.nextSibling };
+        cropSlot.appendChild(cropTools);
+        setMode('crop');
+    }
+
+    function closeCrop(apply) {
+        if (window.exitCropMode) window.exitCropMode(apply);
+        if (cropHome) cropHome.parent.insertBefore(cropTools, cropHome.next);
+        setMode('root');
+    }
+
     panel.querySelectorAll('.m-root [data-open]').forEach(btn => {
         btn.addEventListener('click', () => {
             if (btn.dataset.open === 'texture') {
@@ -417,6 +814,8 @@ function setupMobilePanel() {
                 setMode('texture');
             } else if (btn.dataset.open === 'frame') {
                 openFrame();
+            } else if (btn.dataset.open === 'crop') {
+                openCrop();
             } else {
                 setMode('settings');
             }
@@ -425,6 +824,8 @@ function setupMobilePanel() {
 
     document.getElementById('m-frame-cancel').addEventListener('click', () => closeFrame(false));
     document.getElementById('m-frame-apply').addEventListener('click', () => closeFrame(true));
+    document.getElementById('m-crop-cancel').addEventListener('click', () => closeCrop(false));
+    document.getElementById('m-crop-apply').addEventListener('click', () => closeCrop(true));
 
     document.getElementById('m-set-cancel').addEventListener('click', () => setMode('root'));
     document.getElementById('m-set-apply').addEventListener('click', () => setMode('root'));
@@ -461,6 +862,7 @@ function setupMobilePanel() {
             if (!mq.matches) {
                 if (activeSlider) closeEditor(true);
                 if (panel.dataset.mode === 'frame') closeFrame(true);
+                if (panel.dataset.mode === 'crop') closeCrop(true);
                 setMode('root');
             }
         });
@@ -589,6 +991,7 @@ function setupSliders(elements) {
 
 function setupDownloadButton(downloadButton, canvas) {
     downloadButton.addEventListener('click', async () => {
+        if (cropEdit.active) return; // the canvas is showing the crop preview
         const originalText = downloadButton.innerHTML;
         downloadButton.disabled = true;
         downloadButton.innerHTML = '<span class="material-icon">hourglass_empty</span>Processing...';
@@ -684,16 +1087,13 @@ function loadImage(file) {
             // Draw image with optimized settings
             tempCtx.drawImage(img, 0, 0, newWidth, newHeight);
             
-            // Create the final image with optimized settings
-            originalImage = new Image();
-            originalImage.onload = function() {
-                document.getElementById('preview-container').classList.add('has-image');
-                cachedImageData = null;
-                applyPreviewEffects(true);
+            // Keep the pristine source; crop/straighten derive the working image
+            sourceImage = new Image();
+            sourceImage.onload = function() {
+                appliedCrop = null;
+                setWorkingImage(sourceImage);
             };
-            
-            // Use a more efficient quality setting for JPEG
-            originalImage.src = tempCanvas.toDataURL('image/jpeg', 0.92);
+            sourceImage.src = tempCanvas.toDataURL('image/jpeg', 0.92);
             
             // Clean up
             tempCanvas.remove();
@@ -839,9 +1239,19 @@ function applyEffects(ctx, canvasWidth, canvasHeight, settings, isLowRes = false
     }
 }
 
+function setWorkingImage(img) {
+    originalImage = img;
+    document.getElementById('preview-container').classList.add('has-image');
+    cachedImageData = null;
+    applyPreviewEffects(true);
+}
+
 function applyPreviewEffects(forceFullQuality = false) {
     if (!originalImage) {
         return;
+    }
+    if (cropEdit.active) {
+        return; // the canvas is showing the crop preview
     }
 
     if (isProcessing && !forceFullQuality) {
