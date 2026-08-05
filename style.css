@@ -900,15 +900,13 @@ input[type="range"]::-moz-range-track {
     font-size: 24px;
   }
 
-  #m-cancel .material-icon,
-  #m-set-cancel .material-icon,
-  #m-tex-cancel .material-icon {
+  /* Every panel state uses the same pair, so match on the id suffix rather
+     than listing each screen — a new state gets the colours for free */
+  .m-actions button[id$="-cancel"] .material-icon {
     color: #8a8a8a;
   }
 
-  #m-apply .material-icon,
-  #m-set-apply .material-icon,
-  #m-tex-apply .material-icon {
+  .m-actions button[id$="-apply"] .material-icon {
     color: #FFBF00;
   }
 
