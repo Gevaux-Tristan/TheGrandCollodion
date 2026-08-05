@@ -454,6 +454,51 @@ body.cropping #crop-overlay {
   color: #0F0F0F;
 }
 
+#gallery-open {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px;
+  background: transparent;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  color: #bfbfbf;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  transition: border-color 0.15s ease-out, color 0.15s ease-out;
+}
+
+#gallery-open:hover {
+  border-color: #FFBF00;
+  color: #FFBF00;
+}
+
+#gallery-open:focus-visible {
+  outline: 2px solid #FFBF00;
+  outline-offset: 2px;
+}
+
+/* Count badge, shared by the sidebar button and the mobile top bar */
+.gallery-count {
+  min-width: 18px;
+  height: 18px;
+  margin-left: 8px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #FFBF00;
+  color: #0F0F0F;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 .material-icon {
   font-family: 'Material Icons';
   font-style: normal;
@@ -676,7 +721,8 @@ input[type="range"]::-moz-range-track {
   #texture-control { order: 3; }
   #frame-control { order: 3; }
   #crop-control { order: 3; }
-  #download { order: 4; margin-bottom: 50px; }
+  #download { order: 4; }
+  #gallery-open { order: 5; margin-bottom: 50px; }
 
   /* Crop tools appear in the sidebar only while cropping */
   #crop-tools { display: none; }
@@ -962,6 +1008,298 @@ input[type="range"]::-moz-range-track {
   }
 }
 
+/* ===== Gallery (full-screen overlay, both layouts) ===== */
+
+#gallery {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: #0F0F0F;
+  display: flex;
+  flex-direction: column;
+}
+
+#gallery[hidden] {
+  display: none;
+}
+
+#gallery-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: max(20px, env(safe-area-inset-top)) 20px 16px;
+  border-bottom: 1px solid #FFBF00;
+}
+
+#gallery-title {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+#gallery-sub {
+  margin-top: 3px;
+  font-size: 12px;
+  color: #8a8a8a;
+  font-variant-numeric: tabular-nums;
+}
+
+#gallery-close {
+  margin-left: auto;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  color: #bfbfbf;
+  cursor: pointer;
+}
+
+#gallery-close .material-icon {
+  margin-right: 0;
+  font-size: 26px;
+}
+
+#gallery-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 20px 24px;
+}
+
+/* Capped and centered: auto-fill across an ultrawide screen would otherwise
+   spread a handful of photos into 19 tiny columns */
+#gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+#gallery-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 56px 20px;
+  color: #8a8a8a;
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+#gallery-empty[hidden] {
+  display: none;
+}
+
+#gallery-empty .material-icon {
+  margin-right: 0;
+  font-size: 34px;
+}
+
+.gallery-tile {
+  position: relative;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 2px solid #3a3a3a;
+  border-radius: 8px;
+  background: #1a1a1a;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s ease-out, transform 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.gallery-tile:active {
+  transform: scale(0.97);
+}
+
+.gallery-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.gallery-tile figcaption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 12px 6px 4px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85), transparent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+
+/* Selection marker: hollow ring unselected, filled check when picked */
+.gallery-tile .tile-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+.gallery-tile .tile-check .material-icon {
+  margin-right: 0;
+  font-size: 15px;
+  color: #0F0F0F;
+  opacity: 0;
+}
+
+.gallery-tile[aria-pressed="true"] {
+  border-color: #FFBF00;
+}
+
+.gallery-tile[aria-pressed="true"] .tile-check {
+  background: #FFBF00;
+  border-color: #FFBF00;
+}
+
+.gallery-tile[aria-pressed="true"] .tile-check .material-icon {
+  opacity: 1;
+}
+
+.gallery-tile:focus-visible,
+#gallery-close:focus-visible,
+#gallery-actions button:focus-visible {
+  outline: 2px solid #FFBF00;
+  outline-offset: 2px;
+}
+
+#gallery-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px max(12px, env(safe-area-inset-bottom));
+  border-top: 1px solid #2a2a2a;
+  background: #0F0F0F;
+}
+
+#gallery-actions .spacer {
+  flex: 1;
+}
+
+#gallery-actions button {
+  min-height: 40px;
+  padding: 9px 14px;
+  border-radius: 4px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid #3a3a3a;
+  color: #bfbfbf;
+}
+
+#gallery-actions button .material-icon {
+  font-size: 18px;
+}
+
+#gallery-actions button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+#gallery-actions .danger:not(:disabled) {
+  border-color: #5a3a3a;
+  color: #e88;
+}
+
+#gallery-actions .primary:not(:disabled) {
+  background: #FFBF00;
+  border-color: #FFBF00;
+  color: #0F0F0F;
+}
+
+#gallery-status {
+  flex: 0 0 auto;
+  padding: 0 20px 12px;
+  font-size: 12px;
+  font-weight: bold;
+  color: #FFBF00;
+  font-variant-numeric: tabular-nums;
+}
+
+#gallery-status[hidden] {
+  display: none;
+}
+
+body.gallery-open #mobile-topbar,
+body.gallery-open #mobile-panel {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  /* The badge floats on the round icon button rather than sitting inline */
+  #m-gallery {
+    position: relative;
+  }
+
+  #m-gallery .gallery-count {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    margin-left: 0;
+    border: 2px solid #0F0F0F;
+    height: 20px;
+    line-height: 16px;
+  }
+
+  #gallery-grid {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 10px;
+  }
+
+  #gallery-body {
+    padding: 14px 16px 20px;
+  }
+
+  #gallery-head,
+  #gallery-actions,
+  #gallery-status {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  /* "Tout sélectionner" drops to its own line so the two batch actions
+     keep full-width tap targets on narrow phones */
+  #gallery-actions {
+    flex-wrap: wrap;
+  }
+
+  #gallery-actions .spacer {
+    display: none;
+  }
+
+  #gallery-select-all {
+    flex: 1 0 100%;
+  }
+
+  #gallery-delete,
+  #gallery-export {
+    flex: 1 1 0;
+  }
+}
+
 /* ===== Reduced motion ===== */
 
 @media (prefers-reduced-motion: reduce) {
@@ -971,6 +1309,8 @@ input[type="range"]::-moz-range-track {
   .texture-chip,
   .upload-label,
   #download,
+  #gallery-open,
+  .gallery-tile,
   .icon-btn,
   #blur-focus-reticle,
   input[type="range"]::-webkit-slider-thumb {
@@ -980,6 +1320,7 @@ input[type="range"]::-moz-range-track {
   .texture-chip:active,
   .upload-label:active,
   #download:active,
+  .gallery-tile:active,
   .icon-btn:active,
   input[type="range"]:active::-webkit-slider-thumb {
     transform: none;

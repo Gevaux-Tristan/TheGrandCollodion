@@ -185,6 +185,7 @@ function initializeApp() {
     setupTapToUpload(elements.previewContainer, elements.imageInput);
     setupBlurFocus(elements.previewContainer, elements.canvas);
     setupCropTool(elements.previewContainer, elements.canvas);
+    setupGallery();
 }
 
 // Tap or drag on the loaded photo. Default: place the radial blur focus
@@ -989,24 +990,49 @@ function setupSliders(elements) {
     });
 }
 
+// The GrandCollodion-2026-08-05-14-30-07 — seconds keep names unique when
+// several photos are exported within the same minute
+function exportStamp(date) {
+    const p = n => String(n).padStart(2, '0');
+    return [
+        date.getFullYear(), '-', p(date.getMonth() + 1), '-', p(date.getDate()),
+        '-', p(date.getHours()), '-', p(date.getMinutes()), '-', p(date.getSeconds())
+    ].join('');
+}
+
+function canvasToBlob(canvas, type, quality) {
+    return new Promise((resolve, reject) => {
+        canvas.toBlob(blob => {
+            blob ? resolve(blob) : reject(new Error('canvas.toBlob returned null'));
+        }, type, quality);
+    });
+}
+
+function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = url;
+    link.click();
+    // Revoking synchronously can cancel the download in some browsers
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
 function setupDownloadButton(downloadButton, canvas) {
     downloadButton.addEventListener('click', async () => {
         if (cropEdit.active) return; // the canvas is showing the crop preview
+        if (!originalImage) return;  // nothing loaded: would export a blank canvas
         const originalText = downloadButton.innerHTML;
         downloadButton.disabled = true;
         downloadButton.innerHTML = '<span class="material-icon">hourglass_empty</span>Processing...';
         downloadButton.style.opacity = '0.7';
 
         try {
-            const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
-            const link = document.createElement('a');
-            // Generate filename in the format: The GrandCollodion-[date here]-[Hour here].jpg
-            const now = new Date();
-            const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
-            const hourStr = String(now.getHours()).padStart(2, '0') + '-' + String(now.getMinutes()).padStart(2, '0');
-            link.download = `The GrandCollodion-${dateStr}-${hourStr}.jpg`;
-            link.href = dataUrl;
-            link.click();
+            const blob = await canvasToBlob(canvas, 'image/jpeg', 1.0);
+            const filename = `The GrandCollodion-${exportStamp(new Date())}.jpg`;
+            downloadBlob(blob, filename);
+            // Every download is archived so it can be re-exported in batch later
+            await galleryArchive(canvas, blob, filename);
         } catch (error) {
             console.error('Export failed:', error);
         } finally {
@@ -1015,6 +1041,469 @@ function setupDownloadButton(downloadButton, canvas) {
             downloadButton.style.opacity = '1';
         }
     });
+}
+
+// ===== Gallery storage (IndexedDB) =====
+// Downloads are archived as their final JPEG plus a small thumbnail, so the
+// grid stays cheap to paint and a batch export is a straight file copy.
+
+const GALLERY_DB = 'collodion-gallery';
+const GALLERY_STORE = 'photos';
+const GALLERY_MAX = 60;   // oldest entries are pruned past this
+const THUMB_MAX = 320;    // longest edge of the stored thumbnail, in px
+
+let galleryDbPromise = null;
+
+function openGalleryDb() {
+    if (!galleryDbPromise) {
+        galleryDbPromise = new Promise((resolve, reject) => {
+            const request = indexedDB.open(GALLERY_DB, 1);
+            request.onupgradeneeded = () => {
+                const db = request.result;
+                if (!db.objectStoreNames.contains(GALLERY_STORE)) {
+                    const store = db.createObjectStore(GALLERY_STORE, { keyPath: 'id' });
+                    store.createIndex('createdAt', 'createdAt');
+                }
+            };
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        }).catch(error => {
+            galleryDbPromise = null; // let a later call retry
+            throw error;
+        });
+    }
+    return galleryDbPromise;
+}
+
+// Wraps one transaction: `run` receives the store and returns an IDBRequest
+// (or nothing); the promise settles when the transaction itself completes.
+async function galleryTx(mode, run) {
+    const db = await openGalleryDb();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(GALLERY_STORE, mode);
+        let request;
+        try {
+            request = run(tx.objectStore(GALLERY_STORE));
+        } catch (error) {
+            reject(error);
+            return;
+        }
+        tx.oncomplete = () => resolve(request ? request.result : undefined);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+    });
+}
+
+// Newest first, which is the order the grid shows
+function galleryList() {
+    return galleryTx('readonly', store => store.index('createdAt').getAll())
+        .then(records => (records || []).reverse());
+}
+
+function galleryCount() {
+    return galleryTx('readonly', store => store.count()).then(n => n || 0);
+}
+
+function galleryRemove(ids) {
+    return galleryTx('readwrite', store => {
+        ids.forEach(id => store.delete(id));
+    });
+}
+
+// Keep the archive bounded: drop the oldest entries beyond GALLERY_MAX
+async function galleryPrune() {
+    const total = await galleryCount();
+    if (total <= GALLERY_MAX) return;
+    const stale = await galleryTx('readonly', store =>
+        store.index('createdAt').getAllKeys(null, total - GALLERY_MAX));
+    if (stale && stale.length) await galleryRemove(stale);
+}
+
+async function makeThumbnail(canvas) {
+    const scale = Math.min(1, THUMB_MAX / Math.max(canvas.width, canvas.height));
+    const thumb = document.createElement('canvas');
+    thumb.width = Math.max(1, Math.round(canvas.width * scale));
+    thumb.height = Math.max(1, Math.round(canvas.height * scale));
+    const ctx = thumb.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(canvas, 0, 0, thumb.width, thumb.height);
+    const blob = await canvasToBlob(thumb, 'image/jpeg', 0.82);
+    thumb.remove();
+    return blob;
+}
+
+async function galleryArchive(canvas, blob, filename) {
+    try {
+        const thumb = await makeThumbnail(canvas);
+        await galleryTx('readwrite', store => store.put({
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            createdAt: Date.now(),
+            name: filename,
+            width: canvas.width,
+            height: canvas.height,
+            size: blob.size,
+            blob,
+            thumb
+        }));
+        await galleryPrune();
+    } catch (error) {
+        // A failed archive must never cost the user their download
+        console.error('Gallery archive failed:', error);
+    }
+    refreshGalleryCount();
+}
+
+// ===== Minimal ZIP writer (store method, no compression) =====
+// JPEGs are already compressed, so deflating them would only burn CPU for
+// nothing. Storing them raw keeps this dependency-free and the PWA offline.
+
+const CRC32_TABLE = (() => {
+    const table = new Uint32Array(256);
+    for (let i = 0; i < 256; i++) {
+        let c = i;
+        for (let bit = 0; bit < 8; bit++) {
+            c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+        }
+        table[i] = c >>> 0;
+    }
+    return table;
+})();
+
+function crc32(bytes) {
+    let crc = 0xFFFFFFFF;
+    for (let i = 0; i < bytes.length; i++) {
+        crc = CRC32_TABLE[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+// MS-DOS packed date/time: 2-second resolution, epoch 1980
+function dosDateTime(date) {
+    return {
+        time: (date.getHours() << 11) | (date.getMinutes() << 5) | (date.getSeconds() >> 1),
+        date: ((Math.max(1980, date.getFullYear()) - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate()
+    };
+}
+
+function writeU16(bytes, offset, value) {
+    bytes[offset] = value & 0xFF;
+    bytes[offset + 1] = (value >>> 8) & 0xFF;
+}
+
+function writeU32(bytes, offset, value) {
+    bytes[offset] = value & 0xFF;
+    bytes[offset + 1] = (value >>> 8) & 0xFF;
+    bytes[offset + 2] = (value >>> 16) & 0xFF;
+    bytes[offset + 3] = (value >>> 24) & 0xFF;
+}
+
+class ZipWriter {
+    constructor() {
+        this.parts = [];    // Blob parts, assembled once at the end
+        this.central = [];  // central directory records
+        this.offset = 0;    // running byte offset of the local headers
+    }
+
+    async addBlob(name, blob, date) {
+        const nameBytes = new TextEncoder().encode(name);
+        // Read once for the CRC, then hand the Blob itself to the parts list
+        // so only one file's bytes sit in memory at a time.
+        const crc = crc32(new Uint8Array(await blob.arrayBuffer()));
+        const size = blob.size;
+        const stamp = dosDateTime(date);
+        const localOffset = this.offset;
+
+        const local = new Uint8Array(30 + nameBytes.length);
+        writeU32(local, 0, 0x04034b50);
+        writeU16(local, 4, 20);      // version needed to extract
+        writeU16(local, 6, 0x0800);  // flags: filename is UTF-8
+        writeU16(local, 8, 0);       // method: store
+        writeU16(local, 10, stamp.time);
+        writeU16(local, 12, stamp.date);
+        writeU32(local, 14, crc);
+        writeU32(local, 18, size);
+        writeU32(local, 22, size);
+        writeU16(local, 26, nameBytes.length);
+        writeU16(local, 28, 0);      // extra field length
+        local.set(nameBytes, 30);
+
+        this.parts.push(local, blob);
+        this.offset += local.length + size;
+
+        const central = new Uint8Array(46 + nameBytes.length);
+        writeU32(central, 0, 0x02014b50);
+        writeU16(central, 4, 20);      // version made by
+        writeU16(central, 6, 20);      // version needed
+        writeU16(central, 8, 0x0800);
+        writeU16(central, 10, 0);
+        writeU16(central, 12, stamp.time);
+        writeU16(central, 14, stamp.date);
+        writeU32(central, 16, crc);
+        writeU32(central, 20, size);
+        writeU32(central, 24, size);
+        writeU16(central, 28, nameBytes.length);
+        writeU16(central, 30, 0);      // extra field length
+        writeU16(central, 32, 0);      // comment length
+        writeU16(central, 34, 0);      // disk number start
+        writeU16(central, 36, 0);      // internal attributes
+        writeU32(central, 38, 0);      // external attributes
+        writeU32(central, 42, localOffset);
+        central.set(nameBytes, 46);
+        this.central.push(central);
+    }
+
+    finish() {
+        const centralOffset = this.offset;
+        let centralSize = 0;
+        this.central.forEach(record => {
+            this.parts.push(record);
+            centralSize += record.length;
+        });
+
+        const end = new Uint8Array(22);
+        writeU32(end, 0, 0x06054b50);
+        writeU16(end, 4, 0);   // this disk number
+        writeU16(end, 6, 0);   // disk with the central directory
+        writeU16(end, 8, this.central.length);
+        writeU16(end, 10, this.central.length);
+        writeU32(end, 12, centralSize);
+        writeU32(end, 16, centralOffset);
+        writeU16(end, 20, 0);  // archive comment length
+        this.parts.push(end);
+
+        return new Blob(this.parts, { type: 'application/zip' });
+    }
+}
+
+// ===== Gallery UI =====
+
+const gallerySelection = new Set();
+const galleryThumbUrls = new Map();
+let galleryRecords = [];
+let galleryBusy = false;
+
+function refreshGalleryCount() {
+    galleryCount().then(total => {
+        document.querySelectorAll('.gallery-count').forEach(badge => {
+            badge.textContent = String(total);
+            badge.hidden = total === 0;
+        });
+    }).catch(() => {});
+}
+
+function formatBytes(bytes) {
+    if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' Mo';
+    return Math.max(1, Math.round(bytes / 1024)) + ' Ko';
+}
+
+function releaseThumbUrls() {
+    galleryThumbUrls.forEach(url => URL.revokeObjectURL(url));
+    galleryThumbUrls.clear();
+}
+
+function setGalleryStatus(message) {
+    const status = document.getElementById('gallery-status');
+    status.textContent = message || '';
+    status.hidden = !message;
+}
+
+function setupGallery() {
+    const overlay = document.getElementById('gallery');
+    const grid = document.getElementById('gallery-grid');
+    const empty = document.getElementById('gallery-empty');
+    const subtitle = document.getElementById('gallery-sub');
+    const selectAllBtn = document.getElementById('gallery-select-all');
+    const deleteBtn = document.getElementById('gallery-delete');
+    const exportBtn = document.getElementById('gallery-export');
+    if (!overlay) return;
+
+    function syncActions() {
+        const picked = gallerySelection.size;
+        const total = galleryRecords.length;
+        subtitle.textContent = total
+            ? `${total} photo${total > 1 ? 's' : ''}${picked ? ` · ${picked} sélectionnée${picked > 1 ? 's' : ''}` : ''}`
+            : '';
+        deleteBtn.disabled = exportBtn.disabled = picked === 0 || galleryBusy;
+        selectAllBtn.disabled = total === 0 || galleryBusy;
+        selectAllBtn.textContent = total && picked === total ? 'Tout désélectionner' : 'Tout sélectionner';
+        deleteBtn.innerHTML = `<span class="material-icon">delete</span>Supprimer${picked ? ` (${picked})` : ''}`;
+        exportBtn.innerHTML = `<span class="material-icon">archive</span>Exporter${picked ? ` (${picked})` : ''}`;
+    }
+
+    function toggle(id, tile) {
+        if (gallerySelection.has(id)) gallerySelection.delete(id);
+        else gallerySelection.add(id);
+        tile.setAttribute('aria-pressed', String(gallerySelection.has(id)));
+        syncActions();
+    }
+
+    function buildTile(record) {
+        const tile = document.createElement('button');
+        tile.type = 'button';
+        tile.className = 'gallery-tile';
+        tile.setAttribute('aria-pressed', String(gallerySelection.has(record.id)));
+
+        const url = URL.createObjectURL(record.thumb);
+        galleryThumbUrls.set(record.id, url);
+        const img = document.createElement('img');
+        img.src = url;
+        img.alt = '';
+        tile.appendChild(img);
+
+        const check = document.createElement('span');
+        check.className = 'tile-check';
+        check.innerHTML = '<span class="material-icon">check</span>';
+        tile.appendChild(check);
+
+        const caption = document.createElement('figcaption');
+        const when = new Date(record.createdAt);
+        const time = String(when.getHours()).padStart(2, '0') + ':' + String(when.getMinutes()).padStart(2, '0');
+        caption.textContent = `${time} · ${formatBytes(record.size)}`;
+        tile.appendChild(caption);
+
+        tile.setAttribute('aria-label',
+            `${when.toLocaleDateString('fr-FR')} ${time}, ${record.width}×${record.height}, ${formatBytes(record.size)}`);
+        tile.addEventListener('click', () => toggle(record.id, tile));
+        return tile;
+    }
+
+    async function render() {
+        releaseThumbUrls();
+        grid.textContent = '';
+        try {
+            galleryRecords = await galleryList();
+        } catch (error) {
+            console.error('Gallery read failed:', error);
+            galleryRecords = [];
+            setGalleryStatus('Lecture de la galerie impossible.');
+        }
+        // Drop selections whose photo no longer exists
+        const alive = new Set(galleryRecords.map(r => r.id));
+        Array.from(gallerySelection).forEach(id => {
+            if (!alive.has(id)) gallerySelection.delete(id);
+        });
+        galleryRecords.forEach(record => grid.appendChild(buildTile(record)));
+        empty.hidden = galleryRecords.length > 0;
+        syncActions();
+    }
+
+    function open() {
+        overlay.hidden = false;
+        document.body.classList.add('gallery-open');
+        setGalleryStatus('');
+        render().then(() => document.getElementById('gallery-close').focus());
+    }
+
+    // Always allowed, even mid-export: an in-flight export holds its own
+    // reference to the records, so closing cannot strand it — and this stays
+    // the user's escape hatch if anything ever stalls.
+    function close() {
+        overlay.hidden = true;
+        document.body.classList.remove('gallery-open');
+        releaseThumbUrls();
+        grid.textContent = '';
+        galleryRecords = [];
+        gallerySelection.clear();
+        setGalleryStatus('');
+    }
+
+    function selected() {
+        return galleryRecords.filter(record => gallerySelection.has(record.id));
+    }
+
+    // Two photos exported in the same second would collide inside the zip
+    function uniqueName(name, taken) {
+        if (!taken.has(name)) {
+            taken.add(name);
+            return name;
+        }
+        const dot = name.lastIndexOf('.');
+        const stem = dot > 0 ? name.slice(0, dot) : name;
+        const ext = dot > 0 ? name.slice(dot) : '';
+        let n = 2;
+        let candidate;
+        do {
+            candidate = `${stem} (${n++})${ext}`;
+        } while (taken.has(candidate));
+        taken.add(candidate);
+        return candidate;
+    }
+
+    async function exportSelected() {
+        const records = selected();
+        if (!records.length) return;
+        galleryBusy = true;
+        syncActions();
+        try {
+            if (records.length === 1) {
+                downloadBlob(records[0].blob, records[0].name);
+            } else {
+                const zip = new ZipWriter();
+                const taken = new Set();
+                for (let i = 0; i < records.length; i++) {
+                    setGalleryStatus(`Préparation de l'archive… ${i + 1}/${records.length}`);
+                    // Yield so the status text repaints between files. setTimeout
+                    // rather than requestAnimationFrame: rAF never fires in a
+                    // backgrounded tab, which would hang the export for good.
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                    await zip.addBlob(uniqueName(records[i].name, taken), records[i].blob, new Date(records[i].createdAt));
+                }
+                downloadBlob(zip.finish(), `The GrandCollodion-${exportStamp(new Date())}.zip`);
+            }
+            setGalleryStatus(`${records.length} photo${records.length > 1 ? 's' : ''} exportée${records.length > 1 ? 's' : ''}.`);
+        } catch (error) {
+            console.error('Batch export failed:', error);
+            setGalleryStatus('Export impossible. Réessayez avec moins de photos.');
+        } finally {
+            galleryBusy = false;
+            syncActions();
+        }
+    }
+
+    async function deleteSelected() {
+        const records = selected();
+        if (!records.length) return;
+        const label = records.length > 1
+            ? `Supprimer définitivement ces ${records.length} photos ?`
+            : 'Supprimer définitivement cette photo ?';
+        if (!window.confirm(label)) return;
+        galleryBusy = true;
+        syncActions();
+        try {
+            await galleryRemove(records.map(record => record.id));
+            gallerySelection.clear();
+            setGalleryStatus(`${records.length} photo${records.length > 1 ? 's' : ''} supprimée${records.length > 1 ? 's' : ''}.`);
+        } catch (error) {
+            console.error('Gallery delete failed:', error);
+            setGalleryStatus('Suppression impossible.');
+        } finally {
+            galleryBusy = false;
+            await render();
+            refreshGalleryCount();
+        }
+    }
+
+    selectAllBtn.addEventListener('click', () => {
+        if (gallerySelection.size === galleryRecords.length) gallerySelection.clear();
+        else galleryRecords.forEach(record => gallerySelection.add(record.id));
+        grid.querySelectorAll('.gallery-tile').forEach((tile, i) => {
+            tile.setAttribute('aria-pressed', String(gallerySelection.has(galleryRecords[i].id)));
+        });
+        syncActions();
+    });
+
+    exportBtn.addEventListener('click', exportSelected);
+    deleteBtn.addEventListener('click', deleteSelected);
+    document.getElementById('gallery-close').addEventListener('click', close);
+    document.getElementById('gallery-open').addEventListener('click', open);
+    document.getElementById('m-gallery').addEventListener('click', open);
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !overlay.hidden) close();
+    });
+
+    refreshGalleryCount();
 }
 
 function setupTextureSelect(textureSelect) {
