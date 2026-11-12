@@ -9,7 +9,8 @@ let isProcessing = false;
 let needsUpdate = false;
 let previewCanvas = document.createElement('canvas');
 let previewCtx = previewCanvas.getContext('2d');
-let cachedImageData = null;
+let cachedImageData = null;  // pristine RGB of the working image, not greyscale
+let autoLevels = null;       // { lo, hi } histogram bounds, measured once per upload
 let isSliding = false;
 let lastRenderTime = 0;
 const RENDER_INTERVAL = window.innerWidth <= 900 ? 1000 / 15 : 1000 / 30;
@@ -146,6 +147,7 @@ function initializeApp() {
         contrastSlider: document.getElementById('contrast'),
         opacitySlider: document.getElementById('opacity'),
         grainSlider: document.getElementById('grain'),
+        plaqueSlider: document.getElementById('plaque'),
         exposureSlider: document.getElementById('exposure'),
         radialBlurSlider: document.getElementById('radialBlur'),
         frameScaleSlider: document.getElementById('frameScale'),
@@ -683,6 +685,7 @@ const SLIDER_FORMATTERS = {
     contrast: v => v.toFixed(1),
     opacity: v => Math.round(v * 100) + '%',
     grain: v => Math.round(v * 100) + '%',
+    plaque: v => Math.round(v * 100) + '%',
     exposure: v => (v > 0 ? '+' : '') + v.toFixed(1),
     radialBlur: v => v.toFixed(1),
     frameScale: v => Math.round(v * 100) + '%'
@@ -706,6 +709,7 @@ const SLIDER_LABELS = {
     contrast: 'Contrast',
     opacity: 'Texture opacity',
     grain: 'Grain',
+    plaque: 'Plaque',
     exposure: 'Exposure',
     radialBlur: 'Radial Blur'
 };
@@ -973,6 +977,7 @@ function setupFileUpload(imageInput) {
 
 function setupSliders(elements) {
     const sliders = [
+        elements.plaqueSlider,
         elements.contrastSlider,
         elements.opacitySlider,
         elements.grainSlider,
@@ -1597,8 +1602,143 @@ function loadImage(file) {
     reader.readAsDataURL(file);
 }
 
+// --- Plate pass -------------------------------------------------------------
+// Collodion is sensitive to UV and blue and blind to red: skies burn out white,
+// red lips and ruddy skin go dark, freckles turn black, blue eyes go pale.
+// These are the weights at full strength; the Plaque slider mixes between
+// neutral luma and them.
+const ORTHO = { r: 0.05, g: 0.20, b: 0.75 };
+const LUMA = { r: 0.299, g: 0.587, b: 0.114 };
+
+// Shadows warm-brown, highlights cream. A plate is never neutral grey.
+const TINT_SHADOW = [6, 2, -4];
+const TINT_HIGH = [10, 4, -14];
+
+function orthoWeights(plaque) {
+    return {
+        r: LUMA.r + plaque * (ORTHO.r - LUMA.r),
+        g: LUMA.g + plaque * (ORTHO.g - LUMA.g),
+        b: LUMA.b + plaque * (ORTHO.b - LUMA.b)
+    };
+}
+
+// One histogram per upload, measured on the same orthochromatic mix the render
+// uses, so an underexposed or flat phone photo still lands on the plate's range.
+function computeAutoLevels(imageData, plaque) {
+    const data = imageData.data;
+    const w = orthoWeights(plaque);
+    const hist = new Uint32Array(256);
+    // Sample ~200k pixels: the bounds do not get better past that, and a 48 MP
+    // phone photo would otherwise stall the first render.
+    const step = 4 * Math.max(1, Math.floor(data.length / 4 / 200000));
+    let count = 0;
+    for (let i = 0; i < data.length; i += step) {
+        let v = data[i] * w.r + data[i + 1] * w.g + data[i + 2] * w.b;
+        v = v < 0 ? 0 : (v > 255 ? 255 : v | 0);
+        hist[v]++;
+        count++;
+    }
+    const cutLo = count * 0.005;
+    const cutHi = count * 0.995;
+    let acc = 0;
+    let lo = 0;
+    let hi = 255;
+    for (let i = 0; i < 256; i++) { acc += hist[i]; if (acc >= cutLo) { lo = i; break; } }
+    acc = 0;
+    for (let i = 0; i < 256; i++) { acc += hist[i]; if (acc >= cutHi) { hi = i; break; } }
+    // Cap the stretch: a genuinely foggy or high-key frame should stay that way
+    // instead of being forced into full range.
+    lo = Math.min(lo, 60);
+    hi = Math.max(hi, 195);
+    if (hi - lo < 32) { lo = 0; hi = 255; }
+    return { lo, hi };
+}
+
+// Auto-levels, contrast, exposure, S-curve, lifted toe, blown highlights and
+// split-tone are all per-scalar, so a single 256-entry RGB table replaces the
+// per-pixel float chain that used to run for contrast and exposure alone.
+function buildToneLUT(contrast, exposure, plaque, levels) {
+    const lut = new Uint8ClampedArray(768);
+    const exposureFactor = Math.pow(2, exposure);
+    const lo = levels ? levels.lo : 0;
+    const hi = levels ? levels.hi : 255;
+    const span = Math.max(1, hi - lo);
+    const sCurve = 0.55 * plaque;
+    const toe = 12 * plaque;   // blacks never reach 0: the glass itself carries density
+    const tint = 0.55 * plaque;
+
+    for (let i = 0; i < 256; i++) {
+        let v = (i - lo) / span;
+        v = v < 0 ? 0 : (v > 1 ? 1 : v);
+        v = (v - 0.5) * contrast + 0.5;
+        v *= exposureFactor;
+        v = v < 0 ? 0 : (v > 1 ? 1 : v);
+        v = v + sCurve * ((3 * v * v - 2 * v * v * v) - v);
+        // Collodion blows its highlights rather than rolling off into them
+        if (v > 0.82) v = 0.82 + (v - 0.82) * 1.6;
+        v = v < 0 ? 0 : (v > 1 ? 1 : v);
+        const base = toe + v * (255 - toe);
+        const k = i * 3;
+        lut[k] = base + tint * (TINT_SHADOW[0] + v * (TINT_HIGH[0] - TINT_SHADOW[0]));
+        lut[k + 1] = base + tint * (TINT_SHADOW[1] + v * (TINT_HIGH[1] - TINT_SHADOW[1]));
+        lut[k + 2] = base + tint * (TINT_SHADOW[2] + v * (TINT_HIGH[2] - TINT_SHADOW[2]));
+    }
+    return lut;
+}
+
+// Highlights on a wet plate bleed into their surroundings. Cubing a blurred
+// copy (two multiply passes over itself) leaves only the brightest areas, which
+// are then screened back over the image.
+function applyHalation(ctx, width, height, amount) {
+    const temp = document.createElement('canvas');
+    temp.width = width;
+    temp.height = height;
+    const tctx = temp.getContext('2d');
+    tctx.filter = `blur(${Math.max(2, Math.round(Math.min(width, height) * 0.012))}px)`;
+    tctx.drawImage(ctx.canvas, 0, 0, width, height);
+    tctx.filter = 'none';
+    tctx.globalCompositeOperation = 'multiply';
+    tctx.drawImage(temp, 0, 0);
+    tctx.drawImage(temp, 0, 0);
+    tctx.globalCompositeOperation = 'source-over';
+
+    ctx.globalAlpha = amount;
+    ctx.globalCompositeOperation = 'screen';
+    ctx.drawImage(temp, 0, 0, width, height);
+    ctx.globalAlpha = 1.0;
+    ctx.globalCompositeOperation = 'source-over';
+    temp.remove();
+}
+
+// Density falls off towards the edges of every plate. Centred on the same focus
+// point as the radial blur so both read as one lens.
+function applyVignette(ctx, width, height, amount, focus) {
+    const cx = (focus ? focus.x : 0.5) * width;
+    const cy = (focus ? focus.y : 0.5) * height;
+    const radius = Math.sqrt(
+        Math.pow(Math.max(cx, width - cx), 2) +
+        Math.pow(Math.max(cy, height - cy), 2)
+    );
+    const gradient = ctx.createRadialGradient(cx, cy, radius * 0.35, cx, cy, radius);
+    gradient.addColorStop(0, 'rgba(0,0,0,0)');
+    gradient.addColorStop(1, `rgba(0,0,0,${amount})`);
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+    ctx.globalCompositeOperation = 'source-over';
+}
+
+// Cover-fit, never stretch: a plate scan squeezed onto a portrait crop reads as
+// a distorted overlay instead of glass.
+function drawTextureCover(ctx, texture, width, height) {
+    const scale = Math.max(width / texture.width, height / texture.height);
+    const tw = texture.width * scale;
+    const th = texture.height * scale;
+    ctx.drawImage(texture, (width - tw) / 2, (height - th) / 2, tw, th);
+}
+
 function applyEffects(ctx, canvasWidth, canvasHeight, settings, isLowRes = false) {
-    const { contrast, exposure, radialBlur, opacity, grain, texture, blurCenter: focus, imageData: baseGrayscaleImageData } = settings;
+    const { contrast, exposure, radialBlur, opacity, grain, plaque, texture, blurCenter: focus, imageData: baseGrayscaleImageData } = settings;
 
     let sourceWidth = baseGrayscaleImageData.width;
     let sourceHeight = baseGrayscaleImageData.height;
@@ -1629,20 +1769,19 @@ function applyEffects(ctx, canvasWidth, canvasHeight, settings, isLowRes = false
         workingCtxForEffects.putImageData(baseGrayscaleImageData, 0, 0);
     }
 
-    // Apply Contrast and Exposure
+    // Orthochromatic mix, then one lookup per pixel for everything tonal
     const imageDataForProcessing = workingCtxForEffects.getImageData(0, 0, sourceWidth, sourceHeight);
     const pixelData = imageDataForProcessing.data;
-    const contrastFactor = contrast;
-    const exposureFactor = Math.pow(2, exposure);
+    const weights = orthoWeights(plaque);
+    const lut = buildToneLUT(contrast, exposure, plaque, autoLevels);
 
     for (let i = 0; i < pixelData.length; i += 4) {
-        // Apply contrast and exposure
-        for (let j = 0; j < 3; j++) {
-            let value = pixelData[i + j];
-            value = ((value / 255 - 0.5) * contrastFactor + 0.5) * 255;
-            value = value * exposureFactor;
-            pixelData[i + j] = Math.max(0, Math.min(255, value));
-        }
+        let v = pixelData[i] * weights.r + pixelData[i + 1] * weights.g + pixelData[i + 2] * weights.b;
+        v = v < 0 ? 0 : (v > 255 ? 255 : v);
+        const k = (v | 0) * 3;
+        pixelData[i] = lut[k];
+        pixelData[i + 1] = lut[k + 1];
+        pixelData[i + 2] = lut[k + 2];
     }
 
     workingCtxForEffects.putImageData(imageDataForProcessing, 0, 0);
@@ -1708,6 +1847,14 @@ function applyEffects(ctx, canvasWidth, canvasHeight, settings, isLowRes = false
     
     workingCanvasForEffects.remove();
 
+    // Lens and plate character, before the grain and the glass sit on top.
+    // Halation costs three full-resolution canvas passes, so it is skipped while
+    // a slider is being dragged and comes back on the full-quality render.
+    if (plaque > 0) {
+        if (!isLowRes) applyHalation(ctx, canvasWidth, canvasHeight, plaque * 0.15);
+        applyVignette(ctx, canvasWidth, canvasHeight, plaque * 0.30, focus);
+    }
+
     // Apply Grain (tiled monochrome noise, contrast-neutral around mid-gray)
     if (grain > 0) {
         ctx.globalAlpha = grain * 0.45;
@@ -1722,7 +1869,12 @@ function applyEffects(ctx, canvasWidth, canvasHeight, settings, isLowRes = false
     if (texture && texture.complete && opacity > 0) {
         ctx.globalAlpha = opacity;
         ctx.globalCompositeOperation = "overlay";
-        ctx.drawImage(texture, 0, 0, canvasWidth, canvasHeight);
+        drawTextureCover(ctx, texture, canvasWidth, canvasHeight);
+        // Overlay buries the bright defects of a real plate (comets, bare spots,
+        // pour marks); a light screen pass puts them back above the image.
+        ctx.globalAlpha = opacity * 0.3;
+        ctx.globalCompositeOperation = "screen";
+        drawTextureCover(ctx, texture, canvasWidth, canvasHeight);
         ctx.globalAlpha = 1.0;
         ctx.globalCompositeOperation = "source-over";
     }
@@ -1770,14 +1922,11 @@ function applyPreviewEffects(forceFullQuality = false) {
         
         // Get image data once and cache it
         cachedImageData = previewCtx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
-        
-        // Optimize grayscale conversion
-        const data = cachedImageData.data;
-        const len = data.length;
-        for (let i = 0; i < len; i += 4) {
-            const avg = (data[i] + data[i+1] + data[i+2]) / 3;
-            data[i] = data[i+1] = data[i+2] = avg;
-        }
+
+        // The colour channels are kept on purpose: the plate pass needs them to
+        // emulate orthochromatic sensitivity. Averaging to grey here would throw
+        // away the one thing that makes a collodion read as a collodion.
+        autoLevels = computeAutoLevels(cachedImageData, parseFloat(document.getElementById('plaque').value));
     }
 
     const canvas = document.getElementById('canvas');
@@ -1793,6 +1942,7 @@ function applyPreviewEffects(forceFullQuality = false) {
         radialBlur: parseFloat(document.getElementById('radialBlur').value),
         opacity: parseFloat(document.getElementById('opacity').value),
         grain: parseFloat(document.getElementById('grain').value),
+        plaque: parseFloat(document.getElementById('plaque').value),
         texture: textureImage,
         blurCenter: blurCenter,
         imageData: cachedImageData

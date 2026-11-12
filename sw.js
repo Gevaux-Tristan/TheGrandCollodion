@@ -7,7 +7,7 @@
 // The app preloads every texture at startup, so one online visit fills the cache.
 // Single source of truth: must match the ?v= query in index.html. Deriving
 // both the cache name and the precache URLs from it keeps them in lockstep.
-const ASSET_VERSION = 9;
+const ASSET_VERSION = 10;
 const CACHE_VERSION = 'collodion-v' + ASSET_VERSION;
 const SHELL_CACHE = CACHE_VERSION + '-shell';
 const RUNTIME_CACHE = CACHE_VERSION + '-runtime';

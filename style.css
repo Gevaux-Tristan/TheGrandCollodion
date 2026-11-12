@@ -890,7 +890,7 @@ input[type="range"]::-moz-range-track {
     padding-top: 4px;
   }
 
-  /* Five settings share the row: let items shrink on narrow phones */
+  /* Six settings share the row: let items shrink on narrow phones */
   .m-settings-row [data-slider] {
     flex: 1 1 0;
     min-width: 0;
