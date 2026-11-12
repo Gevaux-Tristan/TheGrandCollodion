@@ -5,6 +5,7 @@ let appliedCrop = null;     // { angle, ratio, rect } or null for full image
 // live crop-editing state; rect is normalized to the rotated bounding box
 const cropEdit = { active: false, angle: 0, ratio: 'free', rect: { x: 0, y: 0, w: 1, h: 1 } };
 let textureImage = new Image();
+let textureScreen = 0.3;    // bright-defect pass of the selected plate
 let isProcessing = false;
 let needsUpdate = false;
 let previewCanvas = document.createElement('canvas');
@@ -80,6 +81,134 @@ function getGrainCanvas() {
 const textureCache = new Map();
 const PREVIEW_TEXTURE_SIZE = 1024; // Maximum size for preview textures
 
+// --- Texture matching ------------------------------------------------------
+// The 42 plate scans were never shot under the same light: their mean level
+// runs from 21 (Collodion-11) to 215 (Collodion-07) and their spread from 10
+// (Collodion-23) to 74 (Collodion-32). Overlay is neutral at mid-grey, so at
+// one global opacity a dark scan crushed the photo while a bright one washed
+// it out, and the same 50% meant something different on every plate.
+//
+// Every texture is therefore matched to Collodion-01, the default and the
+// reference: same mean, same spread, its own pattern untouched. gain and lift
+// map it (v * gain + lift), capped so no more than the outer 1% of its tones
+// can reach 0 or 255, and bounded to 2.2x so a flat scan is not amplified into
+// JPEG mush. screen is how much of the second, bright-defect pass it gets,
+// proportional to how much of its own mass sits above its noise floor: a plate
+// with comets and bare spots earns the flare, a smooth one gets none.
+const TEXTURE_REFERENCE = { mean: 79.2, std: 51.7, bright: 4.53 };
+const TEXTURE_PROFILES = {
+    'Collodion-01.jpg': { gain: 1.000, lift: 0.0, screen: 0.300 },
+    'Collodion-02.jpg': { gain: 2.200, lift: 13.6, screen: 0.205 },
+    'Collodion-03.jpg': { gain: 0.994, lift: 14.4, screen: 0.267 },
+    'Collodion-04.jpg': { gain: 0.818, lift: -46.6, screen: 0.000 },
+    'Collodion-05.jpg': { gain: 1.630, lift: -31.0, screen: 0.198 },
+    'Collodion-06.jpg': { gain: 0.925, lift: -32.4, screen: 0.099 },
+    'Collodion-07.jpg': { gain: 2.200, lift: -392.9, screen: 0.199 },
+    'Collodion-08.jpg': { gain: 2.036, lift: -342.0, screen: 0.000 },
+    'Collodion-9.jpg': { gain: 0.550, lift: -31.2, screen: 0.121 },
+    'Collodion-10.jpg': { gain: 0.669, lift: -25.4, screen: 0.000 },
+    'Collodion-11.jpg': { gain: 2.200, lift: 33.7, screen: 0.275 },
+    'Collodion-12.jpg': { gain: 2.200, lift: -24.9, screen: 0.396 },
+    'Collodion-13.jpg': { gain: 2.200, lift: -9.2, screen: 0.337 },
+    'Collodion-14.jpg': { gain: 2.200, lift: 0.0, screen: 0.285 },
+    'Collodion-15.jpg': { gain: 2.200, lift: -9.7, screen: 0.279 },
+    'Collodion-16.jpg': { gain: 0.734, lift: -17.6, screen: 0.000 },
+    'Collodion-17.jpg': { gain: 0.773, lift: -3.9, screen: 0.000 },
+    'Collodion-18.jpg': { gain: 0.550, lift: -10.0, screen: 0.000 },
+    'Collodion-19.jpg': { gain: 0.550, lift: -13.5, screen: 0.000 },
+    'Collodion-20.jpg': { gain: 1.868, lift: -6.6, screen: 0.199 },
+    'Collodion-21.jpg': { gain: 2.200, lift: -120.6, screen: 0.480 },
+    'Collodion-22.jpg': { gain: 1.410, lift: -10.0, screen: 0.356 },
+    'Collodion-23.jpg': { gain: 2.200, lift: 15.4, screen: 0.207 },
+    'Collodion-24.jpg': { gain: 0.889, lift: -10.7, screen: 0.121 },
+    'Collodion-25.jpg': { gain: 0.975, lift: -15.6, screen: 0.000 },
+    'Collodion-26.jpg': { gain: 0.753, lift: 36.0, screen: 0.480 },
+    'Collodion-27.jpg': { gain: 0.751, lift: -12.0, screen: 0.070 },
+    'Collodion-28.jpg': { gain: 1.290, lift: -6.4, screen: 0.035 },
+    'Collodion-29.jpg': { gain: 1.121, lift: 46.5, screen: 0.406 },
+    'Collodion-30.jpg': { gain: 0.550, lift: -10.6, screen: 0.295 },
+    'Collodion-31.jpg': { gain: 0.620, lift: -7.4, screen: 0.000 },
+    'Collodion-32.jpg': { gain: 0.669, lift: 0.0, screen: 0.000 },
+    'Collodion-33.jpg': { gain: 2.200, lift: 17.8, screen: 0.187 },
+    'Collodion-34.jpg': { gain: 1.136, lift: -28.4, screen: 0.011 },
+    'Collodion-35.jpg': { gain: 1.780, lift: -33.8, screen: 0.148 },
+    'Collodion-36.jpg': { gain: 1.817, lift: -36.3, screen: 0.289 },
+    'Collodion-37.jpg': { gain: 0.873, lift: -22.7, screen: 0.017 },
+    'Collodion-38.jpg': { gain: 0.853, lift: -5.1, screen: 0.035 },
+    'Collodion-39.jpg': { gain: 1.211, lift: -8.5, screen: 0.035 },
+    'Collodion-40.jpg': { gain: 0.975, lift: -1.1, screen: 0.254 },
+    'Collodion-41.jpg': { gain: 1.043, lift: -4.2, screen: 0.041 },
+    'Collodion-42.jpg': { gain: 0.802, lift: -8.0, screen: 0.000 }
+};
+
+// Same derivation as the table above, for a texture added after it was written.
+// Costs one pass over the already-downscaled scan, and only for that texture.
+function measureTextureProfile(ctx, width, height) {
+    const data = ctx.getImageData(0, 0, width, height).data;
+    const hist = new Uint32Array(256);
+    let total = 0;
+    let sum = 0;
+    for (let i = 0; i < data.length; i += 4) {
+        const v = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) | 0;
+        hist[v < 0 ? 0 : (v > 255 ? 255 : v)]++;
+        sum += v;
+        total++;
+    }
+    if (!total) return { gain: 1, lift: 0, screen: 0.3 };
+
+    const mean = sum / total;
+    let sq = 0;
+    for (let v = 0; v < 256; v++) sq += hist[v] * (v - mean) * (v - mean);
+    const std = Math.sqrt(sq / total) || 1;
+    const percentile = q => {
+        let acc = 0;
+        const target = total * q;
+        for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= target) return v; }
+        return 255;
+    };
+    const p01 = percentile(0.01);
+    const p99 = percentile(0.99);
+
+    const caps = [2.2, TEXTURE_REFERENCE.std / std];
+    if (mean - p01 > 0) caps.push(TEXTURE_REFERENCE.mean / (mean - p01));
+    if (p99 - mean > 0) caps.push((255 - TEXTURE_REFERENCE.mean) / (p99 - mean));
+    const gain = Math.max(0.55, Math.min(...caps));
+
+    const threshold = Math.min(250, mean + 2 * std);
+    let bright = 0;
+    for (let v = Math.ceil(threshold); v < 256; v++) bright += hist[v];
+
+    return {
+        gain,
+        lift: TEXTURE_REFERENCE.mean - mean * gain,
+        screen: Math.min(1.6, (bright / total * 100) / TEXTURE_REFERENCE.bright) * 0.3
+    };
+}
+
+// Bake the match into the scan once, so the render loop stays a plain drawImage
+function buildTexturePlate(sourceCanvas, profile) {
+    const plate = document.createElement('canvas');
+    plate.width = sourceCanvas.width;
+    plate.height = sourceCanvas.height;
+    const ctx = plate.getContext('2d');
+    ctx.drawImage(sourceCanvas, 0, 0);
+
+    if (profile.gain === 1 && profile.lift === 0) return plate;
+
+    const lut = new Uint8ClampedArray(256);
+    for (let v = 0; v < 256; v++) lut[v] = v * profile.gain + profile.lift;
+
+    const imageData = ctx.getImageData(0, 0, plate.width, plate.height);
+    const data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+        data[i] = lut[data[i]];
+        data[i + 1] = lut[data[i + 1]];
+        data[i + 2] = lut[data[i + 2]];
+    }
+    ctx.putImageData(imageData, 0, 0);
+    return plate;
+}
+
 // Function to load and optimize texture
 async function loadOptimizedTexture(src) {
     if (textureCache.has(src)) {
@@ -112,10 +241,17 @@ async function loadOptimizedTexture(src) {
             
             const previewTexture = new Image();
             previewTexture.src = previewCanvas.toDataURL('image/png', 0.8);
-            
+
+            const profile = TEXTURE_PROFILES[src] || measureTextureProfile(previewCtx, width, height);
+
             const result = {
                 original: img,
-                preview: previewTexture
+                // Raw scan: the chips show the plate as it was scanned, since
+                // matched plates all share one level and would be hard to tell apart
+                preview: previewTexture,
+                // Matched to the reference plate, this is what gets composited
+                plate: buildTexturePlate(previewCanvas, profile),
+                screen: profile.screen
             };
             
             textureCache.set(src, result);
@@ -170,7 +306,8 @@ function initializeApp() {
 
     // Initialize texture with optimization
     loadOptimizedTexture("Collodion-01.jpg").then(texture => {
-        textureImage = texture.preview;
+        textureImage = texture.plate;
+        textureScreen = texture.screen;
     });
 
     // Configurer les event listeners
@@ -1520,7 +1657,8 @@ function setupTextureSelect(textureSelect) {
 
     textureSelect.addEventListener('change', async () => {
         const texture = await loadOptimizedTexture(textureSelect.value);
-        textureImage = texture.preview;
+        textureImage = texture.plate;
+        textureScreen = texture.screen;
         applyPreviewEffects(true);
     });
 }
@@ -1738,7 +1876,7 @@ function drawTextureCover(ctx, texture, width, height) {
 }
 
 function applyEffects(ctx, canvasWidth, canvasHeight, settings, isLowRes = false) {
-    const { contrast, exposure, radialBlur, opacity, grain, plaque, texture, blurCenter: focus, imageData: baseGrayscaleImageData } = settings;
+    const { contrast, exposure, radialBlur, opacity, grain, plaque, texture, textureScreen: flareAmount, blurCenter: focus, imageData: baseGrayscaleImageData } = settings;
 
     let sourceWidth = baseGrayscaleImageData.width;
     let sourceHeight = baseGrayscaleImageData.height;
@@ -1866,15 +2004,18 @@ function applyEffects(ctx, canvasWidth, canvasHeight, settings, isLowRes = false
     }
 
     // Apply Texture Overlay
-    if (texture && texture.complete && opacity > 0) {
+    if (texture && texture.width > 0 && opacity > 0) {
         ctx.globalAlpha = opacity;
         ctx.globalCompositeOperation = "overlay";
         drawTextureCover(ctx, texture, canvasWidth, canvasHeight);
         // Overlay buries the bright defects of a real plate (comets, bare spots,
-        // pour marks); a light screen pass puts them back above the image.
-        ctx.globalAlpha = opacity * 0.3;
-        ctx.globalCompositeOperation = "screen";
-        drawTextureCover(ctx, texture, canvasWidth, canvasHeight);
+        // pour marks); a screen pass puts them back above the image, as much as
+        // this particular plate actually carries.
+        if (flareAmount > 0) {
+            ctx.globalAlpha = opacity * flareAmount;
+            ctx.globalCompositeOperation = "screen";
+            drawTextureCover(ctx, texture, canvasWidth, canvasHeight);
+        }
         ctx.globalAlpha = 1.0;
         ctx.globalCompositeOperation = "source-over";
     }
@@ -1944,6 +2085,7 @@ function applyPreviewEffects(forceFullQuality = false) {
         grain: parseFloat(document.getElementById('grain').value),
         plaque: parseFloat(document.getElementById('plaque').value),
         texture: textureImage,
+        textureScreen: textureScreen,
         blurCenter: blurCenter,
         imageData: cachedImageData
     };
