@@ -30,7 +30,7 @@
   <meta name="twitter:description" content="Transform your photos into beautiful collodion-style images with this interactive web tool." />
   <meta name="twitter:image" content="https://tristangevaux.github.io/TheGrandCollodion/og-image.png" />
   
-  <link rel="stylesheet" href="style.css?v=11" />
+  <link rel="stylesheet" href="style.css?v=12" />
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <link rel="icon" href="favicon.png" type="image/png" />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
@@ -53,12 +53,11 @@
         </div>
       </div>
     </div>
+    <!-- Edit mode only: leave on the left, save on the right -->
     <div id="mobile-topbar">
-      <button type="button" id="m-download" class="icon-btn" aria-label="Download your collodion"><span class="material-icon">save</span></button>
-      <button type="button" id="m-gallery" class="icon-btn" aria-label="Ouvrir la galerie"><span class="material-icon">photo_library</span><span class="gallery-count" hidden>0</span></button>
+      <button type="button" id="m-close" class="icon-btn secondary" aria-label="Fermer l'édition"><span class="material-icon">close</span></button>
       <span class="spacer" aria-hidden="true"></span>
-      <button type="button" id="m-upload" class="icon-btn" aria-label="Upload your image"><span class="material-icon">image</span></button>
-      <button type="button" id="m-camera" class="icon-btn" aria-label="Take a photo"><span class="material-icon">photo_camera</span></button>
+      <button type="button" id="m-download" class="icon-btn" aria-label="Enregistrer votre collodion"><span class="material-icon">save</span></button>
     </div>
     <div id="mobile-panel" data-mode="root">
       <div class="m-root">
@@ -318,7 +317,8 @@
         <h2 id="gallery-title">Galerie</h2>
         <p id="gallery-sub"></p>
       </div>
-      <button type="button" id="gallery-close" aria-label="Fermer la galerie"><span class="material-icon">close</span></button>
+      <button type="button" id="gallery-select-all">Tout sélectionner</button>
+      <button type="button" id="gallery-close" aria-label="Fermer la galerie" hidden><span class="material-icon">close</span></button>
     </header>
     <div id="gallery-body">
       <div id="gallery-grid" role="group" aria-label="Photos enregistrées"></div>
@@ -328,14 +328,18 @@
         Chaque téléchargement viendra s'archiver ici.
       </p>
     </div>
-    <footer id="gallery-actions">
-      <button type="button" id="gallery-select-all">Tout sélectionner</button>
+    <!-- Stacked actions, thumb-side: import sits above, camera closest to the thumb -->
+    <div id="gallery-fab">
+      <button type="button" id="g-upload" class="fab" aria-label="Importer une image"><span class="material-icon">image</span></button>
+      <button type="button" id="g-camera" class="fab fab-primary mobile-only" aria-label="Prendre une photo"><span class="material-icon">photo_camera</span></button>
+    </div>
+    <footer id="gallery-actions" hidden>
       <span class="spacer" aria-hidden="true"></span>
       <button type="button" id="gallery-delete" class="danger" disabled><span class="material-icon">delete</span>Supprimer</button>
       <button type="button" id="gallery-export" class="primary" disabled><span class="material-icon">archive</span>Exporter</button>
     </footer>
     <p id="gallery-status" role="status" aria-live="polite" hidden></p>
   </div>
-  <script src="script.js?v=11"></script>
+  <script src="script.js?v=12"></script>
 </body>
 </html>

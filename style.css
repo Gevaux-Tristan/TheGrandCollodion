@@ -796,6 +796,12 @@ input[type="range"]::-moz-range-track {
     transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
+  .icon-btn.secondary {
+    background: #1a1a1a;
+    border: 1px solid #3a3a3a;
+    color: #bfbfbf;
+  }
+
   .icon-btn:active {
     transform: scale(0.92);
   }
@@ -1044,8 +1050,37 @@ input[type="range"]::-moz-range-track {
   font-variant-numeric: tabular-nums;
 }
 
+#gallery-head > div:first-child {
+  margin-right: auto;
+}
+
+#gallery-select-all {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  background: transparent;
+  color: #bfbfbf;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+#gallery-select-all:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+#gallery-select-all[hidden],
+#gallery-close[hidden],
+#gallery-actions[hidden],
+#gallery-fab[hidden] {
+  display: none;
+}
+
 #gallery-close {
-  margin-left: auto;
   width: 44px;
   height: 44px;
   flex: 0 0 auto;
@@ -1067,7 +1102,8 @@ input[type="range"]::-moz-range-track {
   flex: 1 1 auto;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 16px 20px 24px;
+  /* Bottom padding clears the stacked action buttons */
+  padding: 16px 20px 140px;
 }
 
 /* Capped and centered: auto-fill across an ultrawide screen would otherwise
@@ -1180,6 +1216,69 @@ input[type="range"]::-moz-range-track {
   outline-offset: 2px;
 }
 
+/* Home-screen actions: vertical stack in the bottom-right thumb zone.
+   Camera sits lowest because it is the shortest reach. */
+#gallery-fab {
+  position: absolute;
+  right: 20px;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.fab {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #3a3a3a;
+  border-radius: 50%;
+  background: #1a1a1a;
+  color: #FFBF00;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
+  transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.15s ease-out;
+}
+
+/* Beats the generic .mobile-only rule, which .fab's own display would
+   otherwise outrank by coming later in the sheet */
+.fab.mobile-only {
+  display: none;
+}
+
+.fab .material-icon {
+  margin-right: 0;
+  font-size: 24px;
+}
+
+.fab:hover {
+  border-color: #FFBF00;
+}
+
+.fab:active {
+  transform: scale(0.92);
+}
+
+.fab:focus-visible {
+  outline: 2px solid #FFBF00;
+  outline-offset: 2px;
+}
+
+.fab-primary {
+  width: 60px;
+  height: 60px;
+  background: #FFBF00;
+  border-color: #FFBF00;
+  color: #0F0F0F;
+}
+
+.fab-primary .material-icon {
+  font-size: 28px;
+}
+
 #gallery-actions {
   flex: 0 0 auto;
   display: flex;
@@ -1249,19 +1348,12 @@ body.gallery-open #mobile-panel {
 }
 
 @media (max-width: 900px) {
-  /* The badge floats on the round icon button rather than sitting inline */
-  #m-gallery {
-    position: relative;
+  .fab.mobile-only {
+    display: grid;
   }
 
-  #m-gallery .gallery-count {
-    position: absolute;
-    top: -2px;
-    right: -2px;
-    margin-left: 0;
-    border: 2px solid #0F0F0F;
-    height: 20px;
-    line-height: 16px;
+  #gallery-fab {
+    right: 16px;
   }
 
   #gallery-grid {
@@ -1270,7 +1362,7 @@ body.gallery-open #mobile-panel {
   }
 
   #gallery-body {
-    padding: 14px 16px 20px;
+    padding: 14px 16px 130px;
   }
 
   #gallery-head,
@@ -1288,10 +1380,6 @@ body.gallery-open #mobile-panel {
 
   #gallery-actions .spacer {
     display: none;
-  }
-
-  #gallery-select-all {
-    flex: 1 0 100%;
   }
 
   #gallery-delete,

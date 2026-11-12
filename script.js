@@ -325,6 +325,7 @@ function initializeApp() {
     setupBlurFocus(elements.previewContainer, elements.canvas);
     setupCropTool(elements.previewContainer, elements.canvas);
     setupGallery();
+    openGallery();
 }
 
 // Tap or drag on the loaded photo. Default: place the radial blur focus
@@ -990,6 +991,9 @@ function setupMobilePanel() {
     document.getElementById('m-tex-apply').addEventListener('click', () => setMode('root'));
 
     // Top bar proxies to the (hidden) desktop controls
+    const closeBtn = document.getElementById('m-close');
+    if (closeBtn) closeBtn.addEventListener('click', () => openGallery());
+
     const proxies = [['m-upload', 'upload'], ['m-camera', 'camera'], ['m-download', 'download']];
     proxies.forEach(([proxyId, targetId]) => {
         const proxy = document.getElementById(proxyId);
@@ -1421,6 +1425,10 @@ class ZipWriter {
 // ===== Gallery UI =====
 
 const gallerySelection = new Set();
+// Set by setupGallery(): the gallery is the home screen, so loading a photo,
+// leaving the editor and booting all need to open or close it.
+let openGallery = () => {};
+let closeGallery = () => {};
 const galleryThumbUrls = new Map();
 let galleryRecords = [];
 let galleryBusy = false;
@@ -1458,6 +1466,9 @@ function setupGallery() {
     const selectAllBtn = document.getElementById('gallery-select-all');
     const deleteBtn = document.getElementById('gallery-delete');
     const exportBtn = document.getElementById('gallery-export');
+    const actions = document.getElementById('gallery-actions');
+    const fab = document.getElementById('gallery-fab');
+    const closeBtn = document.getElementById('gallery-close');
     if (!overlay) return;
 
     function syncActions() {
@@ -1467,7 +1478,12 @@ function setupGallery() {
             ? `${total} photo${total > 1 ? 's' : ''}${picked ? ` · ${picked} sélectionnée${picked > 1 ? 's' : ''}` : ''}`
             : '';
         deleteBtn.disabled = exportBtn.disabled = picked === 0 || galleryBusy;
-        selectAllBtn.disabled = total === 0 || galleryBusy;
+        // Batch bar belongs to selection mode; outside it the stacked
+        // add-a-photo buttons own the bottom-right corner instead.
+        actions.hidden = picked === 0;
+        fab.hidden = picked > 0;
+        selectAllBtn.hidden = total === 0;
+        selectAllBtn.disabled = galleryBusy;
         selectAllBtn.textContent = total && picked === total ? 'Tout désélectionner' : 'Tout sélectionner';
         deleteBtn.innerHTML = `<span class="material-icon">delete</span>Supprimer${picked ? ` (${picked})` : ''}`;
         exportBtn.innerHTML = `<span class="material-icon">archive</span>Exporter${picked ? ` (${picked})` : ''}`;
@@ -1531,16 +1547,20 @@ function setupGallery() {
     }
 
     function open() {
+        if (!overlay.hidden) return;
         overlay.hidden = false;
         document.body.classList.add('gallery-open');
         setGalleryStatus('');
-        render().then(() => document.getElementById('gallery-close').focus());
+        // Nothing loaded yet: the gallery IS the screen, there is no "back"
+        closeBtn.hidden = !originalImage;
+        render().then(() => (closeBtn.hidden ? fab : closeBtn).focus());
     }
 
     // Always allowed, even mid-export: an in-flight export holds its own
     // reference to the records, so closing cannot strand it — and this stays
     // the user's escape hatch if anything ever stalls.
     function close() {
+        if (overlay.hidden) return;
         overlay.hidden = true;
         document.body.classList.remove('gallery-open');
         releaseThumbUrls();
@@ -1637,12 +1657,20 @@ function setupGallery() {
 
     exportBtn.addEventListener('click', exportSelected);
     deleteBtn.addEventListener('click', deleteSelected);
-    document.getElementById('gallery-close').addEventListener('click', close);
+    closeBtn.addEventListener('click', close);
     document.getElementById('gallery-open').addEventListener('click', open);
-    document.getElementById('m-gallery').addEventListener('click', open);
+
+    [['g-upload', 'upload'], ['g-camera', 'camera']].forEach(([btnId, inputId]) => {
+        const btn = document.getElementById(btnId);
+        const input = document.getElementById(inputId);
+        if (btn && input) btn.addEventListener('click', () => input.click());
+    });
+
+    openGallery = open;
+    closeGallery = close;
 
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && !overlay.hidden) close();
+        if (e.key === 'Escape' && !overlay.hidden && originalImage) close();
     });
 
     refreshGalleryCount();
@@ -1724,6 +1752,7 @@ function loadImage(file) {
             sourceImage.onload = function() {
                 appliedCrop = null;
                 setWorkingImage(sourceImage);
+                closeGallery();   // a new photo always lands in the editor
             };
             sourceImage.src = tempCanvas.toDataURL('image/jpeg', 0.92);
             
